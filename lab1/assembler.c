@@ -14,6 +14,7 @@
 
 // Parsing Assembly Language
 
+#define SIXTEEN_BIT_LIMIT_PLUS_1 65536
 #define MAX_LABEL_LEN 20
 #define MAX_SYMBOLS 255
 typedef struct
@@ -36,38 +37,6 @@ enum PARSING_STATUS
     DONE,
     OK,
     EMPTY_LINE,
-};
-
-enum INSTRUCTION_SETS
-{
-    ADD,
-    AND,
-    BRn,
-    BRz,
-    BRp,
-    BR,
-    BRzp,
-    BRnp,
-    BRnz,
-    BRnzp,
-    HALT,
-    JMP,
-    JSR,
-    JSRR,
-    LDB,
-    LDW,
-    LEA,
-    NOP,
-    NOT,
-    RET,
-    RTI,
-    LSHF,
-    RSHFL,
-    RSHFA,
-    STB,
-    STW,
-    TRAP,
-    XOR,
 };
 
 char opcodeMap[28][5] = {
@@ -289,7 +258,179 @@ int toNum(char *pStr)
     }
 }
 
-void firstPass(FILE *infile, int *programCounter, int *symbolTableCnt)
+int hexToBinaryStrCpy(char *pStr, char hex)
+{
+    switch (hex)
+    {
+    case '0':
+        strcpy(pStr, "0000");
+        break;
+    case '1':
+        strcpy(pStr, "0001");
+        break;
+    case '2':
+        strcpy(pStr, "0010");
+        break;
+    case '3':
+        strcpy(pStr, "0011");
+        break;
+    case '4':
+        strcpy(pStr, "0100");
+        break;
+    case '5':
+        strcpy(pStr, "0101");
+        break;
+    case '6':
+        strcpy(pStr, "0110");
+        break;
+    case '7':
+        strcpy(pStr, "0111");
+        break;
+    case '8':
+        strcpy(pStr, "0000");
+        break;
+    case '9':
+        strcpy(pStr, "1001");
+        break;
+    case 'a':
+        strcpy(pStr, "1010");
+        break;
+    case 'b':
+        strcpy(pStr, "1011");
+        break;
+    case 'c':
+        strcpy(pStr, "1100");
+        break;
+    case 'd':
+        strcpy(pStr, "1101");
+        break;
+    case 'e':
+        strcpy(pStr, "1110");
+        break;
+    case 'f':
+        strcpy(pStr, "1111");
+        break;
+
+    default:
+        // throw error
+        break;
+    }
+
+    return 4;
+}
+
+void decToHexStrCpy(char *pStr, int num)
+{
+    int operand = num;
+    if (operand < 0)
+    {
+        operand += SIXTEEN_BIT_LIMIT_PLUS_1;
+    }
+    sprintf(pStr, "%04x", operand);
+}
+
+void outputNumToHexFile(FILE *outfile, int num)
+{
+    fprintf(outfile, "0x%04x\n", num);
+}
+
+void outputBinaryToHexFile(FILE *outfile, char *ptr)
+{
+    int num = 0;
+    while (*ptr == '1' || *ptr == '0')
+    {
+        int cur = *ptr == '1' ? 1 : 0;
+        num = (num << 1) | cur;
+        ptr++;
+    }
+    fprintf(outfile, "0x%04x\n", num);
+}
+
+// ISA
+void add(char **pArg1,
+         char **pArg2,
+         char **pArg3,
+         FILE *outFile)
+{
+    char *op = (char *)malloc(17 * sizeof(char));
+    int cnt = 0;
+    strcpy(op, "0001");
+    cnt += 4;
+
+    // DR
+    if (*pArg1[0] == 'r')
+    {
+        char *hex = (char *)malloc(4 * sizeof(char));
+        char *binary = (char *)malloc(4 * sizeof(char));
+        decToHexStrCpy(hex, ((*pArg1)[1] - '0'));
+        hexToBinaryStrCpy(binary, hex[3]);
+        strcpy(op + cnt, binary + 1);
+        cnt += 3;
+        free(hex);
+        free(binary);
+    }
+    else
+    {
+        // TODO: throw error
+    }
+
+    // SR1
+    if (*pArg2[0] == 'r')
+    {
+        char *hex = (char *)malloc(4 * sizeof(char));
+        char *binary = (char *)malloc(4 * sizeof(char));
+        decToHexStrCpy(hex, (*pArg2)[1] - '0');
+        hexToBinaryStrCpy(binary, hex[3]);
+        strncpy(op + cnt, binary + 1, 3);
+        cnt += 3;
+        free(hex);
+        free(binary);
+    }
+    else
+    {
+        // TODO: throw error
+    }
+
+    if (*pArg3[0] == 'r')
+    {
+        // SR2
+        strcpy(op + cnt, "000");
+        cnt += 3;
+        char *hex = (char *)malloc(4 * sizeof(char));
+        char *binary = (char *)malloc(4 * sizeof(char));
+        decToHexStrCpy(hex, (*pArg3)[1] - '0');
+        hexToBinaryStrCpy(binary, hex[3]);
+        strncpy(op + cnt, binary + 1, 3);
+        cnt += 3;
+        free(hex);
+        free(binary);
+    }
+    else if (*pArg3[0] == '#' || *pArg3[0] == 'x' || *pArg3[0] == 'X')
+    {
+        // TODO: might need to deal with limit of add operand (15 ~ -16)
+        // imm5
+        strcpy(op + cnt, "1");
+        cnt += 1;
+        char *hex = (char *)malloc(4 * sizeof(char));
+        char *binary = (char *)malloc(16 * sizeof(char));
+        decToHexStrCpy(hex, toNum(*pArg3));
+        for (int i = 0; i < 4; i++)
+        {
+            hexToBinaryStrCpy(binary + i * 4, hex[i]);
+        }
+        strncpy(op + cnt, binary + 11, 5);
+        cnt += 5;
+        free(hex);
+        free(binary);
+    }
+    else
+    {
+        // TODO: throw error
+    }
+    outputBinaryToHexFile(outFile, op);
+}
+
+void firstPass(FILE *infile, int *symbolTableCnt)
 {
 
     char *pLine = (char *)malloc(255 * sizeof(char));
@@ -301,6 +442,7 @@ void firstPass(FILE *infile, int *programCounter, int *symbolTableCnt)
     char **pArg4 = (char **)malloc(1 * sizeof(char *));
 
     int programBegin = FALSE;
+    int programCounter = -1;
 
     while (readAndParse(
                infile,
@@ -315,14 +457,14 @@ void firstPass(FILE *infile, int *programCounter, int *symbolTableCnt)
         if (programBegin == FALSE && strncmp(".orig", *pOpcode, 5) == 0)
         {
             programBegin = TRUE;
-            (*programCounter) = toNum(*pArg1) - 2; /* .orig pseudo program counter is the value minus 1 instruction spac*/
+            programCounter = toNum(*pArg1) - 2; /* .orig pseudo program counter is the value minus 1 instruction spac*/
             continue;
         }
-        (*programCounter) += 2;
+        programCounter += 2;
         if (programBegin == TRUE && strlen(*pLabel) > 0)
         {
             TableEntry te;
-            te.address = (*programCounter);
+            te.address = programCounter;
             for (int i = 0; i < strlen(*pLabel); i++)
             {
                 te.label[i] = (*pLabel)[i];
@@ -333,6 +475,56 @@ void firstPass(FILE *infile, int *programCounter, int *symbolTableCnt)
     };
 
     printf("symbol table entry count = %d\n", *symbolTableCnt);
+
+    free(pLine);
+    free(pLabel);
+    free(pOpcode);
+    free(pArg1);
+    free(pArg2);
+    free(pArg3);
+    free(pArg4);
+}
+
+void secondPass(FILE *infile, FILE *outFile, int *symbolTableCnt)
+{
+    char *pLine = (char *)malloc(255 * sizeof(char));
+    char **pLabel = (char **)malloc(1 * sizeof(char *));
+    char **pOpcode = (char **)malloc(1 * sizeof(char *));
+    char **pArg1 = (char **)malloc(1 * sizeof(char *));
+    char **pArg2 = (char **)malloc(1 * sizeof(char *));
+    char **pArg3 = (char **)malloc(1 * sizeof(char *));
+    char **pArg4 = (char **)malloc(1 * sizeof(char *));
+
+    int programBegin = FALSE;
+    int programCounter = -1;
+
+    while (readAndParse(
+               infile,
+               pLine,
+               pLabel,
+               pOpcode,
+               pArg1,
+               pArg2,
+               pArg3,
+               pArg4) != DONE)
+    {
+        if (programBegin == FALSE && strncmp(".orig", *pOpcode, 5) == 0)
+        {
+            programBegin = TRUE;
+            outputNumToHexFile(outFile, toNum(*pArg1));
+            programCounter = toNum(*pArg1) - 2; /* .orig pseudo program counter is the value minus 1 instruction spac*/
+            continue;
+        }
+
+        if (programBegin == TRUE)
+        {
+            // ADD
+            if (strncmp("add", *pOpcode, 3) == 0)
+            {
+                add(pArg1, pArg2, pArg3, outFile);
+            }
+        }
+    };
 
     free(pLine);
     free(pLabel);
@@ -382,12 +574,15 @@ int main(int argc, char *argv[])
     // First Pass
     // 1. Find out where is the start location
     // 2. Construct the symbol table
-    int *programCounter = (int *)malloc(sizeof(int));
     int *symbolTableCnt = (int *)malloc(sizeof(int));
-    firstPass(infile, programCounter, symbolTableCnt);
+    firstPass(infile, symbolTableCnt);
+
+    // rewind infile to read from start
+    rewind(infile);
 
     // Second Pass
     // Generate Machine Language Program
+    secondPass(infile, outfile, symbolTableCnt);
 
     // Closing Files
     fclose(infile);
