@@ -13,17 +13,112 @@
 // LABEL OPCODE OPERANDS ; COMMENTS
 
 // Parsing Assembly Language
+
+#define MAX_LABEL_LEN 20
+#define MAX_SYMBOLS 255
+typedef struct
+{
+    int address;
+    char label[MAX_LABEL_LEN + 1];
+} TableEntry;
+TableEntry symbolTable[MAX_SYMBOLS];
+
 /* Note: MAX_LINE_LENGTH, OK, EMPTY_LINE, and DONE are defined values */
 #define MAX_LINE_LENGTH 255
-enum
+enum BOOLEAN
+{
+    FALSE,
+    TRUE,
+};
+
+enum PARSING_STATUS
 {
     DONE,
     OK,
-    EMPTY_LINE
+    EMPTY_LINE,
 };
 
-bool isOpcode(char *lPtr)
+enum INSTRUCTION_SETS
 {
+    ADD,
+    AND,
+    BRn,
+    BRz,
+    BRp,
+    BR,
+    BRzp,
+    BRnp,
+    BRnz,
+    BRnzp,
+    HALT,
+    JMP,
+    JSR,
+    JSRR,
+    LDB,
+    LDW,
+    LEA,
+    NOP,
+    NOT,
+    RET,
+    RTI,
+    LSHF,
+    RSHFL,
+    RSHFA,
+    STB,
+    STW,
+    TRAP,
+    XOR,
+};
+
+char opcodeMap[28][5] = {
+    "add",
+    "and",
+    "brn",
+    "brz",
+    "brp",
+    "br",
+    "brzp",
+    "brnp",
+    "brnz",
+    "brnzp",
+    "halt",
+    "jmp",
+    "jsr",
+    "jsrr",
+    "ldb",
+    "ldw",
+    "lea",
+    "nop",
+    "not",
+    "ret",
+    "rti",
+    "lshf",
+    "rshfl",
+    "rshfa",
+    "stb",
+    "stw",
+    "trap",
+    "xor",
+};
+
+int isOpcode(char *lPtr)
+{
+    if (lPtr[0] == '.')
+    {
+        // Pseudo Operation
+        return -1;
+    }
+    else
+    {
+        for (int i = 0; i < 28; i++)
+        {
+            if (strncmp(lPtr, opcodeMap[i], strlen(opcodeMap[i])) == 0)
+            {
+                return i;
+            }
+        }
+    }
+    return -1;
 }
 
 int readAndParse(
@@ -54,12 +149,16 @@ int readAndParse(
 
     lPtr = pLine;
     /* ignore the comments */
-    while (*lPtr != ';' && *lPtr != '\0' && *lPtr != '\n')
+    if (*lPtr == ';')
     {
         lPtr++;
+        while (*lPtr != ';' && *lPtr != '\0' && *lPtr != '\n')
+        {
+            lPtr++;
+        }
+        return (OK);
     }
 
-    *lPtr = '\0';
     if (!(lPtr = strtok(pLine, "\t\n ,")))
     {
         return (EMPTY_LINE);
@@ -76,28 +175,24 @@ int readAndParse(
     }
 
     *pOpcode = lPtr;
-
     if (!(lPtr = strtok(NULL, "\t\n ,")))
     {
         return (OK);
     }
 
     *pArg1 = lPtr;
-
     if (!(lPtr = strtok(NULL, "\t\n ,")))
     {
         return (OK);
     }
 
     *pArg2 = lPtr;
-
     if (!(lPtr = strtok(NULL, "\t\n ,")))
     {
         return (OK);
     }
 
     *pArg3 = lPtr;
-
     if (!(lPtr = strtok(NULL, "\t\n ,")))
     {
         return (OK);
@@ -194,21 +289,58 @@ int toNum(char *pStr)
     }
 }
 
-void firstPass(
-    File *infile,
-    int *prgStartLocation,
-    int **symbolTable)
+void firstPass(FILE *infile, int *programCounter, int *symbolTableCnt)
 {
 
-    readAndParse(
-        infile,
-        char *pLine,
-        char **pLabel,
-        char **pOpcode,
-        char **pArg1,
-        char **pArg2,
-        char **pArg3,
-        char **pArg4)
+    char *pLine = (char *)malloc(255 * sizeof(char));
+    char **pLabel = (char **)malloc(1 * sizeof(char *));
+    char **pOpcode = (char **)malloc(1 * sizeof(char *));
+    char **pArg1 = (char **)malloc(1 * sizeof(char *));
+    char **pArg2 = (char **)malloc(1 * sizeof(char *));
+    char **pArg3 = (char **)malloc(1 * sizeof(char *));
+    char **pArg4 = (char **)malloc(1 * sizeof(char *));
+
+    int programBegin = FALSE;
+
+    while (readAndParse(
+               infile,
+               pLine,
+               pLabel,
+               pOpcode,
+               pArg1,
+               pArg2,
+               pArg3,
+               pArg4) != DONE)
+    {
+        if (programBegin == FALSE && strncmp(".orig", *pOpcode, 5) == 0)
+        {
+            programBegin = TRUE;
+            (*programCounter) = toNum(*pArg1) - 2; /* .orig pseudo program counter is the value minus 1 instruction spac*/
+            continue;
+        }
+        (*programCounter) += 2;
+        if (programBegin == TRUE && strlen(*pLabel) > 0)
+        {
+            TableEntry te;
+            te.address = (*programCounter);
+            for (int i = 0; i < strlen(*pLabel); i++)
+            {
+                te.label[i] = (*pLabel)[i];
+            }
+            te.label[strlen(*pLabel)] = '\0';
+            symbolTable[(*symbolTableCnt)++] = te;
+        }
+    };
+
+    printf("symbol table entry count = %d\n", *symbolTableCnt);
+
+    free(pLine);
+    free(pLabel);
+    free(pOpcode);
+    free(pArg1);
+    free(pArg2);
+    free(pArg3);
+    free(pArg4);
 }
 
 int main(int argc, char *argv[])
@@ -219,17 +351,17 @@ int main(int argc, char *argv[])
     char *iFileName = NULL;
     char *oFileName = NULL;
 
-    prgName = NULL;
-    iFileName = NULL;
-    oFileName = NULL;
+    prgName = argv[0];
+    iFileName = argv[1];
+    oFileName = argv[2];
 
     printf("program name = '%s'\n", prgName);
     printf("input file name = '%s'\n", iFileName);
     printf("output file name = '%s'\n", oFileName);
 
     // Opening Files
-    File *infile = NULL;
-    File *outfile = NULL;
+    FILE *infile = NULL;
+    FILE *outfile = NULL;
 
     infile = fopen(argv[1], "r");
     outfile = fopen(argv[2], "w");
@@ -250,6 +382,9 @@ int main(int argc, char *argv[])
     // First Pass
     // 1. Find out where is the start location
     // 2. Construct the symbol table
+    int *programCounter = (int *)malloc(sizeof(int));
+    int *symbolTableCnt = (int *)malloc(sizeof(int));
+    firstPass(infile, programCounter, symbolTableCnt);
 
     // Second Pass
     // Generate Machine Language Program
