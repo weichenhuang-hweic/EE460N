@@ -447,12 +447,10 @@ void ADD(char **pArg1,
          char **pArg3,
          FILE *outFile)
 {
-    // OP
     char *op = (char *)malloc(17 * sizeof(char));
     int cnt = 0;
     strcpy(op, "0001");
     cnt += 4;
-
     cnt += dr(op + cnt, pArg1);
     cnt += sr1(op + cnt, pArg2);
     if (*pArg3[0] == 'r')
@@ -476,12 +474,37 @@ void AND(char **pArg1,
          char **pArg3,
          FILE *outFile)
 {
-    // OP
     char *op = (char *)malloc(17 * sizeof(char));
     int cnt = 0;
     strcpy(op, "0101");
     cnt += 4;
+    cnt += dr(op + cnt, pArg1);
+    cnt += sr1(op + cnt, pArg2);
+    if (*pArg3[0] == 'r')
+    {
+        cnt += sr2(op + cnt, pArg3);
+    }
+    else if (*pArg3[0] == '#' || *pArg3[0] == 'x' || *pArg3[0] == 'X')
+    {
+        cnt += imm5(op + cnt, pArg3);
+    }
+    else
+    {
+        // TODO: throw error
+    }
 
+    outputBinaryToHexFile(outFile, op);
+}
+
+void XOR(char **pArg1,
+         char **pArg2,
+         char **pArg3,
+         FILE *outFile)
+{
+    char *op = (char *)malloc(17 * sizeof(char));
+    int cnt = 0;
+    strcpy(op, "1001");
+    cnt += 4;
     cnt += dr(op + cnt, pArg1);
     cnt += sr1(op + cnt, pArg2);
     if (*pArg3[0] == 'r')
@@ -594,6 +617,10 @@ void secondPass(FILE *infile, FILE *outFile, int *symbolTableCnt)
             else if (strncmp("and", *pOpcode, 3) == 0)
             {
                 AND(pArg1, pArg2, pArg3, outFile);
+            }
+            else if (strncmp("xor", *pOpcode, 3) == 0)
+            {
+                XOR(pArg1, pArg2, pArg3, outFile);
             }
         }
     };
