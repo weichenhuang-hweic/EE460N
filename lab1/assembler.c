@@ -39,7 +39,7 @@ enum PARSING_STATUS
     EMPTY_LINE,
 };
 
-char opcodeMap[28][5] = {
+char opcodeMap[28][6] = {
     "add",
     "and",
     "brn",
@@ -100,6 +100,7 @@ int readAndParse(
     char **pArg3,
     char **pArg4)
 {
+    // TODO: check parser
     char *lPtr;
     int i;
 
@@ -123,14 +124,10 @@ int readAndParse(
         lPtr++;
     }
     /* ignore the comments */
-    if (*lPtr == ';')
+    if (strstr(lPtr, ";") != NULL)
     {
-        lPtr++;
-        while (*lPtr != '\0' && *lPtr != '\n')
-        {
-            lPtr++;
-        }
-        return (OK);
+        char *comment = strstr(lPtr, ";");
+        *comment = '\0';
     }
 
     if (!(lPtr = strtok(pLine, "\t\n ,")))
@@ -740,6 +737,45 @@ void RTI(FILE *outFile)
     free(op);
 }
 
+void SHF(char **pArg1,
+         char **pArg2,
+         char **pArg3,
+         int shiftOption,
+         FILE *outFile)
+{
+    char *op = (char *)malloc(17 * sizeof(char));
+    int cnt = 0;
+    strcpy(op, "1101");
+    cnt += 4;
+    cnt += dr(op + cnt, pArg1);
+    cnt += sr1(op + cnt, pArg2);
+
+    // shiftOption
+    switch (shiftOption)
+    {
+    case 0:
+        strcpy(op + cnt, "00");
+        break;
+    case 1:
+        strcpy(op + cnt, "01");
+        break;
+    case 3:
+        strcpy(op + cnt, "11");
+        break;
+    default:
+        // TODO: Error Handling
+        break;
+    }
+    cnt += 2;
+
+    // Check number limit
+    int num = toNum(*pArg3);
+    cnt += decToBinaryStrCpy(op + cnt, num, 4);
+
+    outputBinaryToHexFile(outFile, op);
+    free(op);
+}
+
 void XOR(char **pArg1,
          char **pArg2,
          char **pArg3,
@@ -898,6 +934,18 @@ void secondPass(FILE *infile, FILE *outFile, int *symbolTableCnt)
             else if (strncmp("rti", *pOpcode, 3) == 0)
             {
                 RTI(outFile);
+            }
+            else if (strncmp("lshf", *pOpcode, 4) == 0)
+            {
+                SHF(pArg1, pArg2, pArg3, 0, outFile);
+            }
+            else if (strncmp("rshfl", *pOpcode, 5) == 0)
+            {
+                SHF(pArg1, pArg2, pArg3, 1, outFile);
+            }
+            else if (strncmp("rshfa", *pOpcode, 5) == 0)
+            {
+                SHF(pArg1, pArg2, pArg3, 3, outFile);
             }
             else if (strncmp("xor", *pOpcode, 3) == 0)
             {
