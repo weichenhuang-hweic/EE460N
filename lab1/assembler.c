@@ -732,6 +732,14 @@ void RET(FILE *outFile)
     free(pArg1);
 }
 
+void RTI(FILE *outFile)
+{
+    char *op = (char *)malloc(17 * sizeof(char));
+    strcpy(op, "1000000000000000");
+    outputBinaryToHexFile(outFile, op);
+    free(op);
+}
+
 void XOR(char **pArg1,
          char **pArg2,
          char **pArg3,
@@ -886,6 +894,10 @@ void secondPass(FILE *infile, FILE *outFile, int *symbolTableCnt)
             else if (strncmp("ret", *pOpcode, 3) == 0)
             {
                 RET(outFile);
+            }
+            else if (strncmp("rti", *pOpcode, 3) == 0)
+            {
+                RTI(outFile);
             }
             else if (strncmp("xor", *pOpcode, 3) == 0)
             {
