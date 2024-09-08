@@ -117,6 +117,11 @@ int readAndParse(
     *pLabel = *pOpcode = *pArg1 = *pArg2 = *pArg3 = *pArg4 = pLine + strlen(pLine);
 
     lPtr = pLine;
+    /* ignore begin space */
+    while (*lPtr == ' ')
+    {
+        lPtr++;
+    }
     /* ignore the comments */
     if (*lPtr == ';')
     {
@@ -441,6 +446,22 @@ int imm5(char *op, char **pArg)
     return 6;
 }
 
+int calculatePcOffset(char *op, int digit, int pcGap)
+{
+    // TODO: handle error (if PCGAP > or < limit => throw error)
+    char *hex = (char *)malloc(4 * sizeof(char));
+    char *binary = (char *)malloc(16 * sizeof(char));
+    decToHexStrCpy(hex, pcGap / 2); // LSHT 1  = divide by 2
+    for (int i = 0; i < 4; i++)
+    {
+        hexToBinaryStrCpy(binary + i * 4, hex[i]);
+    }
+    strncpy(op, binary + 16 - digit, digit);
+    free(hex);
+    free(binary);
+    return digit;
+}
+
 // ISA
 void ADD(char **pArg1,
          char **pArg2,
@@ -493,6 +514,62 @@ void AND(char **pArg1,
         // TODO: throw error
     }
 
+    outputBinaryToHexFile(outFile, op);
+}
+
+void BR(char **pOpcode,
+        char **pArg1,
+        int PC,
+        int symbolTableCnt,
+        FILE *outFile)
+{
+    char *op = (char *)malloc(17 * sizeof(char));
+    int cnt = 0;
+    strcpy(op, "0000");
+    cnt += 4;
+
+    // nzp conditional code
+    int conditional = 0;
+    if (strstr(*pOpcode, "n"))
+    {
+        conditional += 4;
+    }
+    if (strstr(*pOpcode, "z"))
+    {
+        conditional += 2;
+    }
+    if (strstr(*pOpcode, "p"))
+    {
+        conditional += 1;
+    }
+    if (strcmp(*pOpcode, "br") == 0)
+    {
+        conditional = 7;
+    }
+    char *hex = (char *)malloc(4 * sizeof(char));
+    char *binary = (char *)malloc(4 * sizeof(char));
+    decToHexStrCpy(hex, conditional);
+    hexToBinaryStrCpy(binary, hex[3]);
+    strncpy(op + cnt, binary + 1, 3);
+    cnt += 3;
+    free(hex);
+    free(binary);
+
+    // LABEL
+    int jumpPC = -1;
+    for (int i = 0; i < symbolTableCnt; i++)
+    {
+        TableEntry te = symbolTable[i];
+        if (strcmp(*pArg1, te.label) == 0)
+        {
+            jumpPC = te.address;
+            break;
+        }
+    }
+    // TODO: handle no label found
+
+    int pcGap = jumpPC - (PC + 2);
+    cnt += calculatePcOffset(op + cnt, 9, pcGap);
     outputBinaryToHexFile(outFile, op);
 }
 
@@ -567,7 +644,7 @@ void firstPass(FILE *infile, int *symbolTableCnt)
             programCounter = toNum(*pArg1) - 2; /* .orig pseudo program counter is the value minus 1 instruction spac*/
             continue;
         }
-        if (programBegin == TRUE)
+        if (programBegin == TRUE && (strlen(*pLabel) > 0 || strlen(*pOpcode) > 0))
         {
             programCounter += 2;
         }
@@ -621,7 +698,7 @@ void secondPass(FILE *infile, FILE *outFile, int *symbolTableCnt)
             programCounter = toNum(*pArg1) - 2; /* .orig pseudo program counter is the value minus 1 instruction spac*/
             continue;
         }
-        if (programBegin == TRUE)
+        if (programBegin == TRUE && strlen(*pOpcode) > 0)
         {
             programCounter += 2;
             if (strncmp("add", *pOpcode, 3) == 0)
@@ -631,6 +708,10 @@ void secondPass(FILE *infile, FILE *outFile, int *symbolTableCnt)
             else if (strncmp("and", *pOpcode, 3) == 0)
             {
                 AND(pArg1, pArg2, pArg3, outFile);
+            }
+            else if (strncmp("br", *pOpcode, 2) == 0)
+            {
+                BR(pOpcode, pArg1, programCounter, *symbolTableCnt, outFile);
             }
             else if (strncmp("not", *pOpcode, 3) == 0)
             {
