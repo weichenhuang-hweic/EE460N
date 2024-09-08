@@ -591,6 +591,51 @@ void JMP(char **pArg1,
     free(op);
 }
 
+void JSR(char **pOpcode,
+         char **pArg1,
+         int PC,
+         int symbolTableCnt,
+         FILE *outFile)
+{
+    // This includes JSR & JSRR
+    char *op = (char *)malloc(17 * sizeof(char));
+    int cnt = 0;
+    strcpy(op, "0100");
+    cnt += 4;
+
+    if (strcmp(*pOpcode, "jsrr") == 0)
+    {
+        strcpy(op + cnt, "000");
+        cnt += 3;
+        cnt += dr(op + cnt, pArg1); // TODO: error handling operand not register
+        strcpy(op + cnt, "000000");
+        cnt += 6;
+    }
+    else
+    {
+        strcpy(op + cnt, "1");
+        cnt += 1;
+
+        // LABEL
+        int jumpPC = -1;
+        for (int i = 0; i < symbolTableCnt; i++)
+        {
+            TableEntry te = symbolTable[i];
+            if (strcmp(*pArg1, te.label) == 0)
+            {
+                jumpPC = te.address;
+                break;
+            }
+        }
+        // TODO: handle no label found
+
+        int pcGap = jumpPC - (PC + 2);
+        cnt += calculatePcOffset(op + cnt, 11, pcGap);
+    }
+    outputBinaryToHexFile(outFile, op);
+    free(op);
+}
+
 void NOT(char **pArg1,
          char **pArg2,
          FILE *outFile)
@@ -746,6 +791,10 @@ void secondPass(FILE *infile, FILE *outFile, int *symbolTableCnt)
             else if (strncmp("jmp", *pOpcode, 3) == 0)
             {
                 JMP(pArg1, outFile);
+            }
+            else if (strncmp("jsr", *pOpcode, 3) == 0)
+            {
+                JSR(pOpcode, pArg1, programCounter, *symbolTableCnt, outFile);
             }
             else if (strncmp("not", *pOpcode, 3) == 0)
             {
