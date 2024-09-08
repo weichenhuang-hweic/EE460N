@@ -446,6 +446,38 @@ int imm5(char *op, char **pArg)
     return 6;
 }
 
+int boffset6(char *op, char **pArg)
+{
+    if (*pArg[0] == '#' || *pArg[0] == 'x' || *pArg[0] == 'X')
+    {
+        // TODO: do we need binary?
+        // TODO: might need to deal with limit of 6 bit
+        char *hex = (char *)malloc(4 * sizeof(char));
+        char *binary = (char *)malloc(16 * sizeof(char));
+        int num = toNum(*pArg);
+        // if (num > 15 || num < -16)
+        // {
+        //     // TODO: throw error
+        //     printf("Cleaning up, error code = 3\n");
+        //     // exit(3);
+        // }
+        decToHexStrCpy(hex, num);
+        for (int i = 0; i < 4; i++)
+        {
+            hexToBinaryStrCpy(binary + i * 4, hex[i]);
+        }
+        strncpy(op, binary + 10, 6);
+        free(hex);
+        free(binary);
+    }
+    else
+    {
+        // TODO: throw error
+    }
+
+    return 6;
+}
+
 int calculatePcOffset(char *op, int digit, int pcGap)
 {
     // TODO: handle error (if PCGAP > or < limit => throw error)
@@ -636,6 +668,24 @@ void JSR(char **pOpcode,
     free(op);
 }
 
+void LDB(char **pArg1,
+         char **pArg2,
+         char **pArg3,
+         FILE *outFile)
+{
+    char *op = (char *)malloc(17 * sizeof(char));
+    int cnt = 0;
+    strcpy(op, "0010");
+    cnt += 4;
+    cnt += dr(op + cnt, pArg1);
+    cnt += sr1(op + cnt, pArg2);
+
+    // TODO: check pArg3 limit
+    cnt += boffset6(op + cnt, pArg3);
+    outputBinaryToHexFile(outFile, op);
+    free(op);
+}
+
 void NOT(char **pArg1,
          char **pArg2,
          FILE *outFile)
@@ -795,6 +845,10 @@ void secondPass(FILE *infile, FILE *outFile, int *symbolTableCnt)
             else if (strncmp("jsr", *pOpcode, 3) == 0)
             {
                 JSR(pOpcode, pArg1, programCounter, *symbolTableCnt, outFile);
+            }
+            else if (strncmp("ldb", *pOpcode, 3) == 0)
+            {
+                LDB(pArg1, pArg2, pArg3, outFile);
             }
             else if (strncmp("not", *pOpcode, 3) == 0)
             {
