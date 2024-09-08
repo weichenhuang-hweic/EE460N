@@ -335,6 +335,21 @@ void decToHexStrCpy(char *pStr, int num)
     sprintf(pStr, "%04x", operand);
 }
 
+int decToBinaryStrCpy(char *pStr, int num, int digit)
+{
+    char *hex = (char *)malloc(4 * sizeof(char));
+    char *binary = (char *)malloc(16 * sizeof(char));
+    decToHexStrCpy(hex, num);
+    for (int i = 0; i < 4; i++)
+    {
+        hexToBinaryStrCpy(binary + i * 4, hex[i]);
+    }
+    strncpy(pStr, binary + 16 - digit, digit);
+    free(hex);
+    free(binary);
+    return digit;
+}
+
 void outputNumToHexFile(FILE *outfile, int num)
 {
     fprintf(outfile, "0x%04x\n", num);
@@ -420,8 +435,6 @@ int imm5(char *op, char **pArg)
         // TODO: do we need binary?
         // TODO: might need to deal with limit of add operand (15 ~ -16)
         strcpy(op, "1");
-        char *hex = (char *)malloc(4 * sizeof(char));
-        char *binary = (char *)malloc(16 * sizeof(char));
         int num = toNum(*pArg);
         if (num > 15 || num < -16)
         {
@@ -429,46 +442,7 @@ int imm5(char *op, char **pArg)
             printf("Cleaning up, error code = 3\n");
             // exit(3);
         }
-        decToHexStrCpy(hex, num);
-        for (int i = 0; i < 4; i++)
-        {
-            hexToBinaryStrCpy(binary + i * 4, hex[i]);
-        }
-        strncpy(op + 1, binary + 11, 5);
-        free(hex);
-        free(binary);
-    }
-    else
-    {
-        // TODO: throw error
-    }
-
-    return 6;
-}
-
-int boffset6(char *op, char **pArg)
-{
-    if (*pArg[0] == '#' || *pArg[0] == 'x' || *pArg[0] == 'X')
-    {
-        // TODO: do we need binary?
-        // TODO: might need to deal with limit of 6 bit
-        char *hex = (char *)malloc(4 * sizeof(char));
-        char *binary = (char *)malloc(16 * sizeof(char));
-        int num = toNum(*pArg);
-        // if (num > 15 || num < -16)
-        // {
-        //     // TODO: throw error
-        //     printf("Cleaning up, error code = 3\n");
-        //     // exit(3);
-        // }
-        decToHexStrCpy(hex, num);
-        for (int i = 0; i < 4; i++)
-        {
-            hexToBinaryStrCpy(binary + i * 4, hex[i]);
-        }
-        strncpy(op, binary + 10, 6);
-        free(hex);
-        free(binary);
+        decToBinaryStrCpy(op + 1, num, 5);
     }
     else
     {
@@ -668,6 +642,7 @@ void JSR(char **pOpcode,
     free(op);
 }
 
+// TODO: check pArg3 limit
 void LDB(char **pArg1,
          char **pArg2,
          char **pArg3,
@@ -679,9 +654,24 @@ void LDB(char **pArg1,
     cnt += 4;
     cnt += dr(op + cnt, pArg1);
     cnt += sr1(op + cnt, pArg2);
+    cnt += decToBinaryStrCpy(op + cnt, toNum(*pArg3), 6);
+    outputBinaryToHexFile(outFile, op);
+    free(op);
+}
 
-    // TODO: check pArg3 limit
-    cnt += boffset6(op + cnt, pArg3);
+// TODO: check pArg3 limit
+void LDW(char **pArg1,
+         char **pArg2,
+         char **pArg3,
+         FILE *outFile)
+{
+    char *op = (char *)malloc(17 * sizeof(char));
+    int cnt = 0;
+    strcpy(op, "0110");
+    cnt += 4;
+    cnt += dr(op + cnt, pArg1);
+    cnt += sr1(op + cnt, pArg2);
+    cnt += decToBinaryStrCpy(op + cnt, toNum(*pArg3), 6);
     outputBinaryToHexFile(outFile, op);
     free(op);
 }
@@ -849,6 +839,10 @@ void secondPass(FILE *infile, FILE *outFile, int *symbolTableCnt)
             else if (strncmp("ldb", *pOpcode, 3) == 0)
             {
                 LDB(pArg1, pArg2, pArg3, outFile);
+            }
+            else if (strncmp("ldw", *pOpcode, 3) == 0)
+            {
+                LDW(pArg1, pArg2, pArg3, outFile);
             }
             else if (strncmp("not", *pOpcode, 3) == 0)
             {
