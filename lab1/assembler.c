@@ -442,7 +442,7 @@ int imm5(char *op, char **pArg)
 }
 
 // ISA
-void add(char **pArg1,
+void ADD(char **pArg1,
          char **pArg2,
          char **pArg3,
          FILE *outFile)
@@ -451,6 +451,35 @@ void add(char **pArg1,
     char *op = (char *)malloc(17 * sizeof(char));
     int cnt = 0;
     strcpy(op, "0001");
+    cnt += 4;
+
+    cnt += dr(op + cnt, pArg1);
+    cnt += sr1(op + cnt, pArg2);
+    if (*pArg3[0] == 'r')
+    {
+        cnt += sr2(op + cnt, pArg3);
+    }
+    else if (*pArg3[0] == '#' || *pArg3[0] == 'x' || *pArg3[0] == 'X')
+    {
+        cnt += imm5(op + cnt, pArg3);
+    }
+    else
+    {
+        // TODO: throw error
+    }
+
+    outputBinaryToHexFile(outFile, op);
+}
+
+void AND(char **pArg1,
+         char **pArg2,
+         char **pArg3,
+         FILE *outFile)
+{
+    // OP
+    char *op = (char *)malloc(17 * sizeof(char));
+    int cnt = 0;
+    strcpy(op, "0101");
     cnt += 4;
 
     cnt += dr(op + cnt, pArg1);
@@ -558,10 +587,13 @@ void secondPass(FILE *infile, FILE *outFile, int *symbolTableCnt)
         if (programBegin == TRUE)
         {
             programCounter += 2;
-            // ADD
             if (strncmp("add", *pOpcode, 3) == 0)
             {
-                add(pArg1, pArg2, pArg3, outFile);
+                ADD(pArg1, pArg2, pArg3, outFile);
+            }
+            else if (strncmp("and", *pOpcode, 3) == 0)
+            {
+                AND(pArg1, pArg2, pArg3, outFile);
             }
         }
     };
