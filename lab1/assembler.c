@@ -344,7 +344,7 @@ void outputBinaryToHexFile(FILE *outfile, char *ptr)
         num = (num << 1) | cur;
         ptr++;
     }
-    fprintf(outfile, "0x%04x\n", num);
+    fprintf(outfile, "0x%04X\n", num);
 }
 
 int dr(char *op, char **pArg)
@@ -496,6 +496,20 @@ void AND(char **pArg1,
     outputBinaryToHexFile(outFile, op);
 }
 
+void NOT(char **pArg1,
+         char **pArg2,
+         FILE *outFile)
+{
+    char *op = (char *)malloc(17 * sizeof(char));
+    int cnt = 0;
+    strcpy(op, "1001");
+    cnt += 4;
+    cnt += dr(op + cnt, pArg1);
+    cnt += sr1(op + cnt, pArg2);
+    strcpy(op + cnt, "111111");
+    outputBinaryToHexFile(outFile, op);
+}
+
 void XOR(char **pArg1,
          char **pArg2,
          char **pArg3,
@@ -617,6 +631,10 @@ void secondPass(FILE *infile, FILE *outFile, int *symbolTableCnt)
             else if (strncmp("and", *pOpcode, 3) == 0)
             {
                 AND(pArg1, pArg2, pArg3, outFile);
+            }
+            else if (strncmp("not", *pOpcode, 3) == 0)
+            {
+                NOT(pArg1, pArg2, outFile);
             }
             else if (strncmp("xor", *pOpcode, 3) == 0)
             {
