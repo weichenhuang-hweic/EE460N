@@ -100,7 +100,7 @@ int readAndParse(
     char **pArg3,
     char **pArg4)
 {
-    char *lRet, *lPtr;
+    char *lPtr;
     int i;
 
     if (!fgets(pLine, MAX_LINE_LENGTH, pInfile))
@@ -121,7 +121,7 @@ int readAndParse(
     if (*lPtr == ';')
     {
         lPtr++;
-        while (*lPtr != ';' && *lPtr != '\0' && *lPtr != '\n')
+        while (*lPtr != '\0' && *lPtr != '\n')
         {
             lPtr++;
         }
@@ -324,6 +324,7 @@ void decToHexStrCpy(char *pStr, int num)
     int operand = num;
     if (operand < 0)
     {
+        // compute two's compliment
         operand += SIXTEEN_BIT_LIMIT_PLUS_1;
     }
     sprintf(pStr, "%04x", operand);
@@ -346,87 +347,127 @@ void outputBinaryToHexFile(FILE *outfile, char *ptr)
     fprintf(outfile, "0x%04x\n", num);
 }
 
+int dr(char *op, char **pArg)
+{
+    if (*pArg[0] == 'r')
+    {
+        char *hex = (char *)malloc(4 * sizeof(char));
+        char *binary = (char *)malloc(4 * sizeof(char));
+        decToHexStrCpy(hex, ((*pArg)[1] - '0'));
+        hexToBinaryStrCpy(binary, hex[3]);
+        strncpy(op, binary + 1, 3);
+        free(hex);
+        free(binary);
+    }
+    else
+    {
+        // TODO: throw error
+    }
+
+    return 3;
+}
+
+int sr1(char *op, char **pArg)
+{
+    if (*pArg[0] == 'r')
+    {
+        char *hex = (char *)malloc(4 * sizeof(char));
+        char *binary = (char *)malloc(4 * sizeof(char));
+        decToHexStrCpy(hex, (*pArg)[1] - '0');
+        hexToBinaryStrCpy(binary, hex[3]);
+        strncpy(op, binary + 1, 3);
+        free(hex);
+        free(binary);
+    }
+    else
+    {
+        // TODO: throw error
+    }
+
+    return 3;
+}
+
+int sr2(char *op, char **pArg)
+{
+    if (*pArg[0] == 'r')
+    {
+        strcpy(op, "000");
+        char *hex = (char *)malloc(4 * sizeof(char));
+        char *binary = (char *)malloc(4 * sizeof(char));
+        decToHexStrCpy(hex, (*pArg)[1] - '0');
+        hexToBinaryStrCpy(binary, hex[3]);
+        strncpy(op + 3, binary + 1, 3);
+        free(hex);
+        free(binary);
+    }
+    else
+    {
+        // TODO: throw error
+    }
+
+    return 6;
+}
+
+int imm5(char *op, char **pArg)
+{
+    if (*pArg[0] == '#' || *pArg[0] == 'x' || *pArg[0] == 'X')
+    {
+        // TODO: do we need binary?
+        // TODO: might need to deal with limit of add operand (15 ~ -16)
+        strcpy(op, "1");
+        char *hex = (char *)malloc(4 * sizeof(char));
+        char *binary = (char *)malloc(16 * sizeof(char));
+        int num = toNum(*pArg);
+        if (num > 15 || num < -16)
+        {
+            // TODO: throw error
+            printf("Cleaning up, error code = 3\n");
+            // exit(3);
+        }
+        decToHexStrCpy(hex, num);
+        for (int i = 0; i < 4; i++)
+        {
+            hexToBinaryStrCpy(binary + i * 4, hex[i]);
+        }
+        strncpy(op + 1, binary + 11, 5);
+        free(hex);
+        free(binary);
+    }
+    else
+    {
+        // TODO: throw error
+    }
+
+    return 6;
+}
+
 // ISA
 void add(char **pArg1,
          char **pArg2,
          char **pArg3,
          FILE *outFile)
 {
+    // OP
     char *op = (char *)malloc(17 * sizeof(char));
     int cnt = 0;
     strcpy(op, "0001");
     cnt += 4;
 
-    // DR
-    if (*pArg1[0] == 'r')
-    {
-        char *hex = (char *)malloc(4 * sizeof(char));
-        char *binary = (char *)malloc(4 * sizeof(char));
-        decToHexStrCpy(hex, ((*pArg1)[1] - '0'));
-        hexToBinaryStrCpy(binary, hex[3]);
-        strcpy(op + cnt, binary + 1);
-        cnt += 3;
-        free(hex);
-        free(binary);
-    }
-    else
-    {
-        // TODO: throw error
-    }
-
-    // SR1
-    if (*pArg2[0] == 'r')
-    {
-        char *hex = (char *)malloc(4 * sizeof(char));
-        char *binary = (char *)malloc(4 * sizeof(char));
-        decToHexStrCpy(hex, (*pArg2)[1] - '0');
-        hexToBinaryStrCpy(binary, hex[3]);
-        strncpy(op + cnt, binary + 1, 3);
-        cnt += 3;
-        free(hex);
-        free(binary);
-    }
-    else
-    {
-        // TODO: throw error
-    }
-
+    cnt += dr(op + cnt, pArg1);
+    cnt += sr1(op + cnt, pArg2);
     if (*pArg3[0] == 'r')
     {
-        // SR2
-        strcpy(op + cnt, "000");
-        cnt += 3;
-        char *hex = (char *)malloc(4 * sizeof(char));
-        char *binary = (char *)malloc(4 * sizeof(char));
-        decToHexStrCpy(hex, (*pArg3)[1] - '0');
-        hexToBinaryStrCpy(binary, hex[3]);
-        strncpy(op + cnt, binary + 1, 3);
-        cnt += 3;
-        free(hex);
-        free(binary);
+        cnt += sr2(op + cnt, pArg3);
     }
     else if (*pArg3[0] == '#' || *pArg3[0] == 'x' || *pArg3[0] == 'X')
     {
-        // TODO: might need to deal with limit of add operand (15 ~ -16)
-        // imm5
-        strcpy(op + cnt, "1");
-        cnt += 1;
-        char *hex = (char *)malloc(4 * sizeof(char));
-        char *binary = (char *)malloc(16 * sizeof(char));
-        decToHexStrCpy(hex, toNum(*pArg3));
-        for (int i = 0; i < 4; i++)
-        {
-            hexToBinaryStrCpy(binary + i * 4, hex[i]);
-        }
-        strncpy(op + cnt, binary + 11, 5);
-        cnt += 5;
-        free(hex);
-        free(binary);
+        cnt += imm5(op + cnt, pArg3);
     }
     else
     {
         // TODO: throw error
     }
+
     outputBinaryToHexFile(outFile, op);
 }
 
@@ -460,16 +501,15 @@ void firstPass(FILE *infile, int *symbolTableCnt)
             programCounter = toNum(*pArg1) - 2; /* .orig pseudo program counter is the value minus 1 instruction spac*/
             continue;
         }
-        programCounter += 2;
+        if (programBegin == TRUE)
+        {
+            programCounter += 2;
+        }
         if (programBegin == TRUE && strlen(*pLabel) > 0)
         {
             TableEntry te;
             te.address = programCounter;
-            for (int i = 0; i < strlen(*pLabel); i++)
-            {
-                te.label[i] = (*pLabel)[i];
-            }
-            te.label[strlen(*pLabel)] = '\0';
+            strcpy(te.label, *pLabel);
             symbolTable[(*symbolTableCnt)++] = te;
         }
     };
@@ -515,9 +555,9 @@ void secondPass(FILE *infile, FILE *outFile, int *symbolTableCnt)
             programCounter = toNum(*pArg1) - 2; /* .orig pseudo program counter is the value minus 1 instruction spac*/
             continue;
         }
-
         if (programBegin == TRUE)
         {
+            programCounter += 2;
             // ADD
             if (strncmp("add", *pOpcode, 3) == 0)
             {
@@ -537,20 +577,6 @@ void secondPass(FILE *infile, FILE *outFile, int *symbolTableCnt)
 
 int main(int argc, char *argv[])
 {
-
-    // Parsing Command Line Arguments
-    char *prgName = NULL;
-    char *iFileName = NULL;
-    char *oFileName = NULL;
-
-    prgName = argv[0];
-    iFileName = argv[1];
-    oFileName = argv[2];
-
-    printf("program name = '%s'\n", prgName);
-    printf("input file name = '%s'\n", iFileName);
-    printf("output file name = '%s'\n", oFileName);
-
     // Opening Files
     FILE *infile = NULL;
     FILE *outfile = NULL;
