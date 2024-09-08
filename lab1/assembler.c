@@ -488,6 +488,7 @@ void ADD(char **pArg1,
     }
 
     outputBinaryToHexFile(outFile, op);
+    free(op);
 }
 
 void AND(char **pArg1,
@@ -515,6 +516,7 @@ void AND(char **pArg1,
     }
 
     outputBinaryToHexFile(outFile, op);
+    free(op);
 }
 
 void BR(char **pOpcode,
@@ -571,6 +573,22 @@ void BR(char **pOpcode,
     int pcGap = jumpPC - (PC + 2);
     cnt += calculatePcOffset(op + cnt, 9, pcGap);
     outputBinaryToHexFile(outFile, op);
+    free(op);
+}
+
+void JMP(char **pArg1,
+         FILE *outFile)
+{
+    char *op = (char *)malloc(17 * sizeof(char));
+    int cnt = 0;
+    strcpy(op, "1100");
+    cnt += 4;
+    strcpy(op + cnt, "000");
+    cnt += 3;
+    cnt += dr(op + cnt, pArg1);
+    cnt += calculatePcOffset(op + cnt, 6, 0);
+    outputBinaryToHexFile(outFile, op);
+    free(op);
 }
 
 void NOT(char **pArg1,
@@ -585,6 +603,17 @@ void NOT(char **pArg1,
     cnt += sr1(op + cnt, pArg2);
     strcpy(op + cnt, "111111");
     outputBinaryToHexFile(outFile, op);
+    free(op);
+}
+
+void RET(FILE *outFile)
+{
+    char **pArg1 = (char **)malloc(sizeof(char *));
+    pArg1[0] = (char *)malloc(3 * sizeof(char));
+    strcpy(*pArg1, "r7");
+    JMP(pArg1, outFile);
+    free(pArg1[0]);
+    free(pArg1);
 }
 
 void XOR(char **pArg1,
@@ -612,6 +641,7 @@ void XOR(char **pArg1,
     }
 
     outputBinaryToHexFile(outFile, op);
+    free(op);
 }
 
 void firstPass(FILE *infile, int *symbolTableCnt)
@@ -713,9 +743,17 @@ void secondPass(FILE *infile, FILE *outFile, int *symbolTableCnt)
             {
                 BR(pOpcode, pArg1, programCounter, *symbolTableCnt, outFile);
             }
+            else if (strncmp("jmp", *pOpcode, 3) == 0)
+            {
+                JMP(pArg1, outFile);
+            }
             else if (strncmp("not", *pOpcode, 3) == 0)
             {
                 NOT(pArg1, pArg2, outFile);
+            }
+            else if (strncmp("ret", *pOpcode, 3) == 0)
+            {
+                RET(outFile);
             }
             else if (strncmp("xor", *pOpcode, 3) == 0)
             {
