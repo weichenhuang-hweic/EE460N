@@ -676,6 +676,37 @@ void LDW(char **pArg1,
     free(op);
 }
 
+void LEA(char **pArg1,
+         char **pArg2,
+         int PC,
+         int symbolTableCnt,
+         FILE *outFile)
+{
+    char *op = (char *)malloc(17 * sizeof(char));
+    int cnt = 0;
+    strcpy(op, "1110");
+    cnt += 4;
+    cnt += dr(op + cnt, pArg1);
+
+    // LABEL
+    int jumpPC = -1;
+    for (int i = 0; i < symbolTableCnt; i++)
+    {
+        TableEntry te = symbolTable[i];
+        if (strcmp(*pArg2, te.label) == 0)
+        {
+            jumpPC = te.address;
+            break;
+        }
+    }
+    // TODO: handle no label found
+    int pcGap = jumpPC - (PC + 2);
+    cnt += calculatePcOffset(op + cnt, 9, pcGap);
+
+    outputBinaryToHexFile(outFile, op);
+    free(op);
+}
+
 void NOT(char **pArg1,
          char **pArg2,
          FILE *outFile)
@@ -843,6 +874,10 @@ void secondPass(FILE *infile, FILE *outFile, int *symbolTableCnt)
             else if (strncmp("ldw", *pOpcode, 3) == 0)
             {
                 LDW(pArg1, pArg2, pArg3, outFile);
+            }
+            else if (strncmp("lea", *pOpcode, 3) == 0)
+            {
+                LEA(pArg1, pArg2, programCounter, *symbolTableCnt, outFile);
             }
             else if (strncmp("not", *pOpcode, 3) == 0)
             {
