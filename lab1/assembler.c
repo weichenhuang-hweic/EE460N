@@ -349,7 +349,7 @@ int decToBinaryStrCpy(char *pStr, int num, int digit)
 
 void outputNumToHexFile(FILE *outfile, int num)
 {
-    fprintf(outfile, "0x%04x\n", num);
+    fprintf(outfile, "0x%04X\n", num);
 }
 
 void outputBinaryToHexFile(FILE *outfile, char *ptr)
@@ -362,6 +362,16 @@ void outputBinaryToHexFile(FILE *outfile, char *ptr)
         ptr++;
     }
     fprintf(outfile, "0x%04X\n", num);
+}
+
+unsigned int drInt(char **pArg)
+{
+    return (*pArg)[1] - '0';
+}
+
+unsigned int srInt(char **pArg)
+{
+    return drInt(pArg);
 }
 
 int dr(char *op, char **pArg)
@@ -449,6 +459,11 @@ int imm5(char *op, char **pArg)
     return 6;
 }
 
+int pcOffset(int pcGap, int digit)
+{
+    return (pcGap >> 1) & (0xFFFF >> (16 - digit));
+}
+
 int calculatePcOffset(char *op, int digit, int pcGap)
 {
     // TODO: handle error (if PCGAP > or < limit => throw error)
@@ -471,27 +486,25 @@ void ADD(char **pArg1,
          char **pArg3,
          FILE *outFile)
 {
-    char *op = (char *)malloc(17 * sizeof(char));
-    int cnt = 0;
-    strcpy(op, "0001");
-    cnt += 4;
-    cnt += dr(op + cnt, pArg1);
-    cnt += sr1(op + cnt, pArg2);
+    unsigned int op = 0;
+    unsigned int opcode = 0b0001;
+    unsigned int dr = drInt(pArg1);
+    unsigned int sr1 = srInt(pArg2);
     if (*pArg3[0] == 'r')
     {
-        cnt += sr2(op + cnt, pArg3);
+        unsigned int sr2 = srInt(pArg3);
+        op = opcode << 12 | dr << 9 | sr1 << 6 | (0b000) << 3 | sr2;
     }
     else if (*pArg3[0] == '#' || *pArg3[0] == 'x' || *pArg3[0] == 'X')
     {
-        cnt += imm5(op + cnt, pArg3);
+        unsigned int imme5 = toNum(*pArg3) & 0x001F;
+        op = opcode << 12 | dr << 9 | sr1 << 6 | (0b1) << 5 | (imme5);
     }
     else
     {
         // TODO: throw error
     }
-
-    outputBinaryToHexFile(outFile, op);
-    free(op);
+    outputNumToHexFile(outFile, op);
 }
 
 void AND(char **pArg1,
@@ -499,27 +512,25 @@ void AND(char **pArg1,
          char **pArg3,
          FILE *outFile)
 {
-    char *op = (char *)malloc(17 * sizeof(char));
-    int cnt = 0;
-    strcpy(op, "0101");
-    cnt += 4;
-    cnt += dr(op + cnt, pArg1);
-    cnt += sr1(op + cnt, pArg2);
+    unsigned int op = 0;
+    unsigned int opcode = 0b0101;
+    unsigned int dr = drInt(pArg1);
+    unsigned int sr1 = srInt(pArg2);
     if (*pArg3[0] == 'r')
     {
-        cnt += sr2(op + cnt, pArg3);
+        unsigned int sr2 = srInt(pArg3);
+        op = opcode << 12 | dr << 9 | sr1 << 6 | (0b000) << 3 | sr2;
     }
     else if (*pArg3[0] == '#' || *pArg3[0] == 'x' || *pArg3[0] == 'X')
     {
-        cnt += imm5(op + cnt, pArg3);
+        unsigned int imme5 = toNum(*pArg3) & 0x001F;
+        op = opcode << 12 | dr << 9 | sr1 << 6 | (0b1) << 5 | (imme5);
     }
     else
     {
         // TODO: throw error
     }
-
-    outputBinaryToHexFile(outFile, op);
-    free(op);
+    outputNumToHexFile(outFile, op);
 }
 
 void BR(char **pOpcode,
@@ -528,13 +539,11 @@ void BR(char **pOpcode,
         int symbolTableCnt,
         FILE *outFile)
 {
-    char *op = (char *)malloc(17 * sizeof(char));
-    int cnt = 0;
-    strcpy(op, "0000");
-    cnt += 4;
+    unsigned int op = 0;
+    unsigned int opcode = 0b0000;
+    unsigned int conditional = 0;
 
-    // nzp conditional code
-    int conditional = 0;
+    // Conditional Code
     if (strstr(*pOpcode, "n"))
     {
         conditional += 4;
@@ -551,14 +560,6 @@ void BR(char **pOpcode,
     {
         conditional = 7;
     }
-    char *hex = (char *)malloc(4 * sizeof(char));
-    char *binary = (char *)malloc(4 * sizeof(char));
-    decToHexStrCpy(hex, conditional);
-    hexToBinaryStrCpy(binary, hex[3]);
-    strncpy(op + cnt, binary + 1, 3);
-    cnt += 3;
-    free(hex);
-    free(binary);
 
     // LABEL
     int jumpPC = -1;
@@ -571,27 +572,22 @@ void BR(char **pOpcode,
             break;
         }
     }
-    // TODO: handle no label found
+    // TODO: handle no label found & Invalid LABEL
 
     int pcGap = jumpPC - (PC + 2);
-    cnt += calculatePcOffset(op + cnt, 9, pcGap);
-    outputBinaryToHexFile(outFile, op);
-    free(op);
+    unsigned int pcOffset9 = pcOffset(pcGap, 9);
+    op = opcode << 12 | conditional << 9 | (pcOffset9);
+    outputNumToHexFile(outFile, op);
 }
 
 void JMP(char **pArg1,
          FILE *outFile)
 {
-    char *op = (char *)malloc(17 * sizeof(char));
-    int cnt = 0;
-    strcpy(op, "1100");
-    cnt += 4;
-    strcpy(op + cnt, "000");
-    cnt += 3;
-    cnt += dr(op + cnt, pArg1);
-    cnt += calculatePcOffset(op + cnt, 6, 0);
-    outputBinaryToHexFile(outFile, op);
-    free(op);
+    unsigned int op = 0;
+    unsigned int opcode = 0b1100;
+    unsigned int baseR = srInt(pArg1);
+    op = opcode << 12 | (0b000) << 9 | baseR << 6 | 0b0;
+    outputNumToHexFile(outFile, op);
 }
 
 void JSR(char **pOpcode,
@@ -601,24 +597,16 @@ void JSR(char **pOpcode,
          FILE *outFile)
 {
     // This includes JSR & JSRR
-    char *op = (char *)malloc(17 * sizeof(char));
-    int cnt = 0;
-    strcpy(op, "0100");
-    cnt += 4;
+    unsigned int op = 0;
+    unsigned int opcode = 0b0100;
 
     if (strcmp(*pOpcode, "jsrr") == 0)
     {
-        strcpy(op + cnt, "000");
-        cnt += 3;
-        cnt += dr(op + cnt, pArg1); // TODO: error handling operand not register
-        strcpy(op + cnt, "000000");
-        cnt += 6;
+        unsigned int baseR = srInt(pArg1);
+        op = opcode << 12 | (0b000) << 9 | baseR << 6 | 0b0;
     }
     else
     {
-        strcpy(op + cnt, "1");
-        cnt += 1;
-
         // LABEL
         int jumpPC = -1;
         for (int i = 0; i < symbolTableCnt; i++)
@@ -630,13 +618,14 @@ void JSR(char **pOpcode,
                 break;
             }
         }
-        // TODO: handle no label found
+        // TODO: handle no label found & Invalid LABEL
 
         int pcGap = jumpPC - (PC + 2);
-        cnt += calculatePcOffset(op + cnt, 11, pcGap);
+        unsigned int pcOffset11 = pcOffset(pcGap, 11);
+        op = opcode << 12 | (0b1) << 11 | pcOffset11;
     }
-    outputBinaryToHexFile(outFile, op);
-    free(op);
+
+    outputNumToHexFile(outFile, op);
 }
 
 // TODO: check pArg3 limit
@@ -645,15 +634,14 @@ void LDB(char **pArg1,
          char **pArg3,
          FILE *outFile)
 {
-    char *op = (char *)malloc(17 * sizeof(char));
-    int cnt = 0;
-    strcpy(op, "0010");
-    cnt += 4;
-    cnt += dr(op + cnt, pArg1);
-    cnt += sr1(op + cnt, pArg2);
-    cnt += decToBinaryStrCpy(op + cnt, toNum(*pArg3), 6);
-    outputBinaryToHexFile(outFile, op);
-    free(op);
+    unsigned int op = 0;
+    unsigned int opcode = 0b0010;
+    unsigned int dr = drInt(pArg1);
+    unsigned int baseR = srInt(pArg2);
+    // TODO: check number limit
+    unsigned int boffset6 = toNum(*pArg3) & 0x3F;
+    op = opcode << 12 | dr << 9 | baseR << 6 | boffset6;
+    outputNumToHexFile(outFile, op);
 }
 
 // TODO: check pArg3 limit
@@ -662,15 +650,14 @@ void LDW(char **pArg1,
          char **pArg3,
          FILE *outFile)
 {
-    char *op = (char *)malloc(17 * sizeof(char));
-    int cnt = 0;
-    strcpy(op, "0110");
-    cnt += 4;
-    cnt += dr(op + cnt, pArg1);
-    cnt += sr1(op + cnt, pArg2);
-    cnt += decToBinaryStrCpy(op + cnt, toNum(*pArg3), 6);
-    outputBinaryToHexFile(outFile, op);
-    free(op);
+    unsigned int op = 0;
+    unsigned int opcode = 0b0110;
+    unsigned int dr = drInt(pArg1);
+    unsigned int baseR = srInt(pArg2);
+    // TODO: check number limit
+    unsigned int offset6 = toNum(*pArg3) & 0x3F;
+    op = opcode << 12 | dr << 9 | baseR << 6 | offset6;
+    outputNumToHexFile(outFile, op);
 }
 
 void LEA(char **pArg1,
@@ -679,12 +666,9 @@ void LEA(char **pArg1,
          int symbolTableCnt,
          FILE *outFile)
 {
-    char *op = (char *)malloc(17 * sizeof(char));
-    int cnt = 0;
-    strcpy(op, "1110");
-    cnt += 4;
-    cnt += dr(op + cnt, pArg1);
-
+    unsigned int op = 0;
+    unsigned int opcode = 0b1110;
+    unsigned int dr = drInt(pArg1);
     // LABEL
     int jumpPC = -1;
     for (int i = 0; i < symbolTableCnt; i++)
@@ -696,53 +680,40 @@ void LEA(char **pArg1,
             break;
         }
     }
-    // TODO: handle no label found
-    int pcGap = jumpPC - (PC + 2);
-    cnt += calculatePcOffset(op + cnt, 9, pcGap);
+    // TODO: handle no label found & Invalid LABEL
 
-    outputBinaryToHexFile(outFile, op);
-    free(op);
+    int pcGap = jumpPC - (PC + 2);
+    unsigned int pcOffset9 = pcOffset(pcGap, 9);
+    op = opcode << 12 | dr << 9 | pcOffset9;
+
+    outputNumToHexFile(outFile, op);
 }
 
 void NOP(FILE *outFile)
 {
-    char *op = (char *)malloc(17 * sizeof(char));
-    strcpy(op, "0000000000000000");
-    outputBinaryToHexFile(outFile, op);
-    free(op);
+    outputNumToHexFile(outFile, 0x0000);
 }
 
 void NOT(char **pArg1,
          char **pArg2,
          FILE *outFile)
 {
-    char *op = (char *)malloc(17 * sizeof(char));
-    int cnt = 0;
-    strcpy(op, "1001");
-    cnt += 4;
-    cnt += dr(op + cnt, pArg1);
-    cnt += sr1(op + cnt, pArg2);
-    strcpy(op + cnt, "111111");
-    outputBinaryToHexFile(outFile, op);
-    free(op);
+    unsigned int op = 0;
+    unsigned int opcode = 0b1001;
+    unsigned int dr = drInt(pArg1);
+    unsigned int sr1 = srInt(pArg2);
+    op = opcode << 12 | dr << 9 | sr1 << 6 | (0b111111);
+    outputNumToHexFile(outFile, op);
 }
 
 void RET(FILE *outFile)
 {
-    char **pArg1 = (char **)malloc(sizeof(char *));
-    pArg1[0] = (char *)malloc(3 * sizeof(char));
-    strcpy(*pArg1, "r7");
-    JMP(pArg1, outFile);
-    free(pArg1[0]);
-    free(pArg1);
+    outputNumToHexFile(outFile, 0xC1C0);
 }
 
 void RTI(FILE *outFile)
 {
-    char *op = (char *)malloc(17 * sizeof(char));
-    strcpy(op, "1000000000000000");
-    outputBinaryToHexFile(outFile, op);
-    free(op);
+    outputNumToHexFile(outFile, 0x8000);
 }
 
 void SHF(char **pArg1,
@@ -751,37 +722,15 @@ void SHF(char **pArg1,
          int shiftOption,
          FILE *outFile)
 {
-    char *op = (char *)malloc(17 * sizeof(char));
-    int cnt = 0;
-    strcpy(op, "1101");
-    cnt += 4;
-    cnt += dr(op + cnt, pArg1);
-    cnt += sr1(op + cnt, pArg2);
-
-    // shiftOption
-    switch (shiftOption)
-    {
-    case 0:
-        strcpy(op + cnt, "00");
-        break;
-    case 1:
-        strcpy(op + cnt, "01");
-        break;
-    case 3:
-        strcpy(op + cnt, "11");
-        break;
-    default:
-        // TODO: Error Handling
-        break;
-    }
-    cnt += 2;
-
-    // Check number limit
-    int num = toNum(*pArg3);
-    cnt += decToBinaryStrCpy(op + cnt, num, 4);
-
-    outputBinaryToHexFile(outFile, op);
-    free(op);
+    unsigned int op = 0;
+    unsigned int opcode = 0b1101;
+    unsigned int dr = drInt(pArg1);
+    unsigned int sr = srInt(pArg2);
+    unsigned int option = shiftOption & 0x03;
+    // TODO: check number limit
+    unsigned int amount4 = toNum(*pArg3) & 0x0F;
+    op = opcode << 12 | dr << 9 | sr << 6 | option << 4 | amount4;
+    outputNumToHexFile(outFile, op);
 }
 
 void STB(char **pArg1,
@@ -789,18 +738,14 @@ void STB(char **pArg1,
          char **pArg3,
          FILE *outFile)
 {
-    char *op = (char *)malloc(17 * sizeof(char));
-    int cnt = 0;
-    strcpy(op, "0011");
-    cnt += 4;
-    cnt += sr1(op + cnt, pArg1);
-    cnt += sr1(op + cnt, pArg2);
-
+    unsigned int op = 0;
+    unsigned int opcode = 0b0011;
+    unsigned int sr = srInt(pArg1);
+    unsigned int baseR = srInt(pArg2);
     // TODO: check number limit
-    decToBinaryStrCpy(op + cnt, toNum(*pArg3), 6);
-
-    outputBinaryToHexFile(outFile, op);
-    free(op);
+    unsigned int boffset6 = toNum(*pArg3) & 0x3F;
+    op = opcode << 12 | sr << 9 | baseR << 6 | boffset6;
+    outputNumToHexFile(outFile, op);
 }
 
 void STW(char **pArg1,
@@ -808,35 +753,25 @@ void STW(char **pArg1,
          char **pArg3,
          FILE *outFile)
 {
-    char *op = (char *)malloc(17 * sizeof(char));
-    int cnt = 0;
-    strcpy(op, "0111");
-    cnt += 4;
-    cnt += sr1(op + cnt, pArg1);
-    cnt += sr1(op + cnt, pArg2);
-
+    unsigned int op = 0;
+    unsigned int opcode = 0b0111;
+    unsigned int sr = srInt(pArg1);
+    unsigned int baseR = srInt(pArg2);
     // TODO: check number limit
-    decToBinaryStrCpy(op + cnt, toNum(*pArg3), 6);
-
-    outputBinaryToHexFile(outFile, op);
-    free(op);
+    unsigned int offset6 = toNum(*pArg3) & 0x3F;
+    op = opcode << 12 | sr << 9 | baseR << 6 | offset6;
+    outputNumToHexFile(outFile, op);
 }
 
 void TRAP(char **pArg1,
           FILE *outFile)
 {
-    char *op = (char *)malloc(17 * sizeof(char));
-    int cnt = 0;
-    strcpy(op, "1111");
-    cnt += 4;
-    strcpy(op + cnt, "0000");
-    cnt += 4;
-
+    unsigned int op = 0;
+    unsigned int opcode = 0b1111;
     // TODO: check number limit
-    decToBinaryStrCpy(op + cnt, toNum(*pArg1), 8);
-
-    outputBinaryToHexFile(outFile, op);
-    free(op);
+    unsigned int trapvect8 = toNum(*pArg1) & 0xFF;
+    op = opcode << 12 | (0b0000) << 8 | trapvect8;
+    outputNumToHexFile(outFile, op);
 }
 
 void HALT(FILE *outFile)
@@ -852,27 +787,25 @@ void XOR(char **pArg1,
          char **pArg3,
          FILE *outFile)
 {
-    char *op = (char *)malloc(17 * sizeof(char));
-    int cnt = 0;
-    strcpy(op, "1001");
-    cnt += 4;
-    cnt += dr(op + cnt, pArg1);
-    cnt += sr1(op + cnt, pArg2);
+    unsigned int op = 0;
+    unsigned int opcode = 0b1001;
+    unsigned int dr = drInt(pArg1);
+    unsigned int sr1 = srInt(pArg2);
     if (*pArg3[0] == 'r')
     {
-        cnt += sr2(op + cnt, pArg3);
+        unsigned int sr2 = srInt(pArg3);
+        op = opcode << 12 | dr << 9 | sr1 << 6 | (0b000) << 3 | sr2;
     }
     else if (*pArg3[0] == '#' || *pArg3[0] == 'x' || *pArg3[0] == 'X')
     {
-        cnt += imm5(op + cnt, pArg3);
+        unsigned int imme5 = toNum(*pArg3) & 0x001F;
+        op = opcode << 12 | dr << 9 | sr1 << 6 | (0b1) << 5 | (imme5);
     }
     else
     {
         // TODO: throw error
     }
-
-    outputBinaryToHexFile(outFile, op);
-    free(op);
+    outputNumToHexFile(outFile, op);
 }
 
 void PS_FILL(char **pArg1,
@@ -882,10 +815,8 @@ void PS_FILL(char **pArg1,
     // TODO: check memory limit
     // TODO: check number limit
 
-    char *op = (char *)malloc(17 * sizeof(char));
-    decToBinaryStrCpy(op, toNum(*pArg1), 16);
-    outputBinaryToHexFile(outFile, op);
-    free(op);
+    unsigned int num = toNum(*pArg1) & 0xFFFF;
+    outputNumToHexFile(outFile, num);
 }
 
 void firstPass(FILE *infile, int *symbolTableCnt)
