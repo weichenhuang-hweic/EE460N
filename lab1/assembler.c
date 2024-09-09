@@ -776,6 +776,25 @@ void SHF(char **pArg1,
     free(op);
 }
 
+void STB(char **pArg1,
+         char **pArg2,
+         char **pArg3,
+         FILE *outFile)
+{
+    char *op = (char *)malloc(17 * sizeof(char));
+    int cnt = 0;
+    strcpy(op, "0011");
+    cnt += 4;
+    cnt += sr1(op + cnt, pArg1);
+    cnt += sr1(op + cnt, pArg2);
+
+    // TODO: check number limit
+    decToBinaryStrCpy(op + cnt, toNum(*pArg3), 6);
+
+    outputBinaryToHexFile(outFile, op);
+    free(op);
+}
+
 void XOR(char **pArg1,
          char **pArg2,
          char **pArg3,
@@ -946,6 +965,10 @@ void secondPass(FILE *infile, FILE *outFile, int *symbolTableCnt)
             else if (strncmp("rshfa", *pOpcode, 5) == 0)
             {
                 SHF(pArg1, pArg2, pArg3, 3, outFile);
+            }
+            else if (strncmp("stb", *pOpcode, 3) == 0)
+            {
+                STB(pArg1, pArg2, pArg3, outFile);
             }
             else if (strncmp("xor", *pOpcode, 3) == 0)
             {
