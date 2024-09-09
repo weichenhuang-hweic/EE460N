@@ -229,7 +229,18 @@ unsigned int srInt(char **pArg) {
     return drInt(pArg);
 }
 
-int pcOffset(int pcGap, int digit) {
+int pcOffset(char **pLabel, int curPC, int digit) {
+    int jumpPC = -1;
+    for (int i = 0; i < symbolTableCnt; i++) {
+        TableEntry te = symbolTable[i];
+        if (strcmp(*pLabel, te.label) == 0) {
+            jumpPC = te.address;
+            break;
+        }
+    }
+    // TODO: handle no label found & Invalid LABEL
+
+    int pcGap = jumpPC - (curPC + 2);
     return (pcGap >> 1) & (0xFFFF >> (16 - digit));
 }
 
@@ -287,19 +298,8 @@ void BR(char **pOpcode, char **pArg1, int PC, int symbolTableCnt, FILE *outFile)
         conditional = 7;
     }
 
-    // LABEL
-    int jumpPC = -1;
-    for (int i = 0; i < symbolTableCnt; i++) {
-        TableEntry te = symbolTable[i];
-        if (strcmp(*pArg1, te.label) == 0) {
-            jumpPC = te.address;
-            break;
-        }
-    }
-    // TODO: handle no label found & Invalid LABEL
+    unsigned int pcOffset9 = pcOffset(pArg1, PC, 9);
 
-    int pcGap = jumpPC - (PC + 2);
-    unsigned int pcOffset9 = pcOffset(pcGap, 9);
     op = opcode << 12 | conditional << 9 | (pcOffset9);
     outputNumToHexFile(outFile, op);
 }
@@ -321,19 +321,7 @@ void JSR(char **pOpcode, char **pArg1, int PC, int symbolTableCnt, FILE *outFile
         unsigned int baseR = srInt(pArg1);
         op = opcode << 12 | (0b000) << 9 | baseR << 6 | 0b0;
     } else {
-        // LABEL
-        int jumpPC = -1;
-        for (int i = 0; i < symbolTableCnt; i++) {
-            TableEntry te = symbolTable[i];
-            if (strcmp(*pArg1, te.label) == 0) {
-                jumpPC = te.address;
-                break;
-            }
-        }
-        // TODO: handle no label found & Invalid LABEL
-
-        int pcGap = jumpPC - (PC + 2);
-        unsigned int pcOffset11 = pcOffset(pcGap, 11);
+        unsigned int pcOffset11 = pcOffset(pArg1, PC, 11);
         op = opcode << 12 | (0b1) << 11 | pcOffset11;
     }
 
@@ -368,19 +356,7 @@ void LEA(char **pArg1, char **pArg2, int PC, int symbolTableCnt, FILE *outFile) 
     unsigned int op = 0;
     unsigned int opcode = 0b1110;
     unsigned int dr = drInt(pArg1);
-    // LABEL
-    int jumpPC = -1;
-    for (int i = 0; i < symbolTableCnt; i++) {
-        TableEntry te = symbolTable[i];
-        if (strcmp(*pArg2, te.label) == 0) {
-            jumpPC = te.address;
-            break;
-        }
-    }
-    // TODO: handle no label found & Invalid LABEL
-
-    int pcGap = jumpPC - (PC + 2);
-    unsigned int pcOffset9 = pcOffset(pcGap, 9);
+    unsigned int pcOffset9 = pcOffset(pArg2, PC, 9);
     op = opcode << 12 | dr << 9 | pcOffset9;
 
     outputNumToHexFile(outFile, op);
