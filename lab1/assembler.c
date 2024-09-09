@@ -3,18 +3,16 @@
 // Title: Lab 1 - Part I: Write an assembler for the LC-3b Assembly Language
 // Date Begin: 2024/09/02
 
+#include <ctype.h>  /* Library for useful character operations */
+#include <limits.h> /* Library for definitions of common variable type characteristics */
 #include <stdio.h>  /* standard input/output library */
 #include <stdlib.h> /* Standard C Library */
 #include <string.h> /* String operations library */
-#include <ctype.h>  /* Library for useful character operations */
-#include <limits.h> /* Library for definitions of common variable type characteristics */
 
 // Syntax of Assembly Code
 // LABEL OPCODE OPERANDS ; COMMENTS
-
 // Parsing Assembly Language
 
-#define SIXTEEN_BIT_LIMIT_PLUS_1 65536
 #define MAX_LABEL_LEN 20
 #define MAX_SYMBOLS 255
 typedef struct
@@ -26,14 +24,12 @@ TableEntry symbolTable[MAX_SYMBOLS];
 
 /* Note: MAX_LINE_LENGTH, OK, EMPTY_LINE, and DONE are defined values */
 #define MAX_LINE_LENGTH 255
-enum BOOLEAN
-{
+enum BOOLEAN {
     FALSE,
     TRUE,
 };
 
-enum PARSING_STATUS
-{
+enum PARSING_STATUS {
     DONE,
     OK,
     EMPTY_LINE,
@@ -70,19 +66,13 @@ char opcodeMap[28][6] = {
     "xor",
 };
 
-int isOpcode(char *lPtr)
-{
-    if (lPtr[0] == '.')
-    {
+int isOpcode(char *lPtr) {
+    if (lPtr[0] == '.') {
         // Pseudo Operation
         return -1;
-    }
-    else
-    {
-        for (int i = 0; i < 28; i++)
-        {
-            if (strncmp(lPtr, opcodeMap[i], strlen(opcodeMap[i])) == 0)
-            {
+    } else {
+        for (int i = 0; i < 28; i++) {
+            if (strncmp(lPtr, opcodeMap[i], strlen(opcodeMap[i])) == 0) {
                 return i;
             }
         }
@@ -90,28 +80,17 @@ int isOpcode(char *lPtr)
     return -1;
 }
 
-int readAndParse(
-    FILE *pInfile,
-    char *pLine,
-    char **pLabel,
-    char **pOpcode,
-    char **pArg1,
-    char **pArg2,
-    char **pArg3,
-    char **pArg4)
-{
+int readAndParse(FILE *pInfile, char *pLine, char **pLabel, char **pOpcode, char **pArg1, char **pArg2, char **pArg3, char **pArg4) {
     // TODO: check parser
     char *lPtr;
     int i;
 
-    if (!fgets(pLine, MAX_LINE_LENGTH, pInfile))
-    {
+    if (!fgets(pLine, MAX_LINE_LENGTH, pInfile)) {
         return (DONE);
     }
 
     /* convert entire line to lowercase */
-    for (i = 0; i < strlen(pLine); i++)
-    {
+    for (i = 0; i < strlen(pLine); i++) {
         pLine[i] = tolower(pLine[i]);
     }
 
@@ -119,53 +98,44 @@ int readAndParse(
 
     lPtr = pLine;
     /* ignore begin space */
-    while (*lPtr == ' ')
-    {
+    while (*lPtr == ' ') {
         lPtr++;
     }
     /* ignore the comments */
-    if (strstr(lPtr, ";") != NULL)
-    {
+    if (strstr(lPtr, ";") != NULL) {
         char *comment = strstr(lPtr, ";");
         *comment = '\0';
     }
 
-    if (!(lPtr = strtok(pLine, "\t\n ,")))
-    {
+    if (!(lPtr = strtok(pLine, "\t\n ,"))) {
         return (EMPTY_LINE);
     }
 
     /* found a label */
-    if (isOpcode(lPtr) == -1 && lPtr[0] != '.')
-    {
+    if (isOpcode(lPtr) == -1 && lPtr[0] != '.') {
         *pLabel = lPtr;
-        if (!(lPtr = strtok(NULL, "\t\n ,")))
-        {
+        if (!(lPtr = strtok(NULL, "\t\n ,"))) {
             return (OK);
         }
     }
 
     *pOpcode = lPtr;
-    if (!(lPtr = strtok(NULL, "\t\n ,")))
-    {
+    if (!(lPtr = strtok(NULL, "\t\n ,"))) {
         return (OK);
     }
 
     *pArg1 = lPtr;
-    if (!(lPtr = strtok(NULL, "\t\n ,")))
-    {
+    if (!(lPtr = strtok(NULL, "\t\n ,"))) {
         return (OK);
     }
 
     *pArg2 = lPtr;
-    if (!(lPtr = strtok(NULL, "\t\n ,")))
-    {
+    if (!(lPtr = strtok(NULL, "\t\n ,"))) {
         return (OK);
     }
 
     *pArg3 = lPtr;
-    if (!(lPtr = strtok(NULL, "\t\n ,")))
-    {
+    if (!(lPtr = strtok(NULL, "\t\n ,"))) {
         return (OK);
     }
 
@@ -175,8 +145,7 @@ int readAndParse(
 }
 
 // Convert a String To a Number
-int toNum(char *pStr)
-{
+int toNum(char *pStr) {
     char *t_ptr;
     char *orig_pStr;
     int t_length, k;
@@ -186,13 +155,11 @@ int toNum(char *pStr)
     orig_pStr = pStr;
 
     /* decimal */
-    if (*pStr == '#')
-    {
+    if (*pStr == '#') {
         pStr++;
 
         /* dec is negative */
-        if (*pStr == '-')
-        {
+        if (*pStr == '-') {
             lNeg = 1;
             pStr++;
         }
@@ -200,10 +167,8 @@ int toNum(char *pStr)
         t_ptr = pStr;
         t_length = strlen(t_ptr);
 
-        for (k = 0; k < t_length; k++)
-        {
-            if (!isdigit(*t_ptr))
-            {
+        for (k = 0; k < t_length; k++) {
+            if (!isdigit(*t_ptr)) {
                 printf("Error: invalid decimal operand, %s\n", orig_pStr);
                 exit(4);
             }
@@ -211,21 +176,18 @@ int toNum(char *pStr)
         }
 
         lNum = atoi(pStr);
-        if (lNeg)
-        {
+        if (lNeg) {
             lNum = -lNum;
         }
 
         return lNum;
     }
     /* hex */
-    else if (*pStr == 'x')
-    {
+    else if (*pStr == 'x') {
         pStr++;
 
         /* hex is negative */
-        if (*pStr == '-')
-        {
+        if (*pStr == '-') {
             lNeg = 1;
             pStr++;
         }
@@ -233,10 +195,8 @@ int toNum(char *pStr)
         t_ptr = pStr;
         t_length = strlen(t_ptr);
 
-        for (k = 0; k < t_length; k++)
-        {
-            if (!isxdigit(*t_ptr))
-            {
+        for (k = 0; k < t_length; k++) {
+            if (!isxdigit(*t_ptr)) {
                 printf("Error: invalid hex operand, %s\n", orig_pStr);
                 exit(4);
             }
@@ -246,128 +206,92 @@ int toNum(char *pStr)
         lNumLong = strtol(pStr, NULL, 16); /* convert hex string into integer */
         lNum = (lNumLong > INT_MAX) ? INT_MAX : lNumLong;
 
-        if (lNeg)
-        {
+        if (lNeg) {
             lNum = -lNum;
         }
 
         return lNum;
-    }
-    else
-    {
+    } else {
         printf("Error: invalid operand, %s\n", orig_pStr);
         exit(4); /* This has been changed from error code 3 to error code 4, see clarification 12 */
     }
 }
 
-void outputNumToHexFile(FILE *outfile, int num)
-{
+void outputNumToHexFile(FILE *outfile, int num) {
     fprintf(outfile, "0x%04X\n", num);
 }
 
-unsigned int drInt(char **pArg)
-{
+unsigned int drInt(char **pArg) {
     return (*pArg)[1] - '0';
 }
 
-unsigned int srInt(char **pArg)
-{
+unsigned int srInt(char **pArg) {
     return drInt(pArg);
 }
 
-int pcOffset(int pcGap, int digit)
-{
+int pcOffset(int pcGap, int digit) {
     return (pcGap >> 1) & (0xFFFF >> (16 - digit));
 }
 
 // ISA
-void ADD(char **pArg1,
-         char **pArg2,
-         char **pArg3,
-         FILE *outFile)
-{
+void ADD(char **pArg1, char **pArg2, char **pArg3, FILE *outFile) {
     unsigned int op = 0;
     unsigned int opcode = 0b0001;
     unsigned int dr = drInt(pArg1);
     unsigned int sr1 = srInt(pArg2);
-    if (*pArg3[0] == 'r')
-    {
+    if (*pArg3[0] == 'r') {
         unsigned int sr2 = srInt(pArg3);
         op = opcode << 12 | dr << 9 | sr1 << 6 | (0b000) << 3 | sr2;
-    }
-    else if (*pArg3[0] == '#' || *pArg3[0] == 'x' || *pArg3[0] == 'X')
-    {
+    } else if (*pArg3[0] == '#' || *pArg3[0] == 'x' || *pArg3[0] == 'X') {
         unsigned int imme5 = toNum(*pArg3) & 0x001F;
         op = opcode << 12 | dr << 9 | sr1 << 6 | (0b1) << 5 | (imme5);
-    }
-    else
-    {
+    } else {
         // TODO: throw error
     }
     outputNumToHexFile(outFile, op);
 }
 
-void AND(char **pArg1,
-         char **pArg2,
-         char **pArg3,
-         FILE *outFile)
-{
+void AND(char **pArg1, char **pArg2, char **pArg3, FILE *outFile) {
     unsigned int op = 0;
     unsigned int opcode = 0b0101;
     unsigned int dr = drInt(pArg1);
     unsigned int sr1 = srInt(pArg2);
-    if (*pArg3[0] == 'r')
-    {
+    if (*pArg3[0] == 'r') {
         unsigned int sr2 = srInt(pArg3);
         op = opcode << 12 | dr << 9 | sr1 << 6 | (0b000) << 3 | sr2;
-    }
-    else if (*pArg3[0] == '#' || *pArg3[0] == 'x' || *pArg3[0] == 'X')
-    {
+    } else if (*pArg3[0] == '#' || *pArg3[0] == 'x' || *pArg3[0] == 'X') {
         unsigned int imme5 = toNum(*pArg3) & 0x001F;
         op = opcode << 12 | dr << 9 | sr1 << 6 | (0b1) << 5 | (imme5);
-    }
-    else
-    {
+    } else {
         // TODO: throw error
     }
     outputNumToHexFile(outFile, op);
 }
 
-void BR(char **pOpcode,
-        char **pArg1,
-        int PC,
-        int symbolTableCnt,
-        FILE *outFile)
-{
+void BR(char **pOpcode, char **pArg1, int PC, int symbolTableCnt, FILE *outFile) {
     unsigned int op = 0;
     unsigned int opcode = 0b0000;
     unsigned int conditional = 0;
 
     // Conditional Code
-    if (strstr(*pOpcode, "n"))
-    {
+    if (strstr(*pOpcode, "n")) {
         conditional += 4;
     }
-    if (strstr(*pOpcode, "z"))
-    {
+    if (strstr(*pOpcode, "z")) {
         conditional += 2;
     }
-    if (strstr(*pOpcode, "p"))
-    {
+    if (strstr(*pOpcode, "p")) {
         conditional += 1;
     }
-    if (strcmp(*pOpcode, "br") == 0)
-    {
+    if (strcmp(*pOpcode, "br") == 0) {
         conditional = 7;
     }
 
     // LABEL
     int jumpPC = -1;
-    for (int i = 0; i < symbolTableCnt; i++)
-    {
+    for (int i = 0; i < symbolTableCnt; i++) {
         TableEntry te = symbolTable[i];
-        if (strcmp(*pArg1, te.label) == 0)
-        {
+        if (strcmp(*pArg1, te.label) == 0) {
             jumpPC = te.address;
             break;
         }
@@ -380,9 +304,7 @@ void BR(char **pOpcode,
     outputNumToHexFile(outFile, op);
 }
 
-void JMP(char **pArg1,
-         FILE *outFile)
-{
+void JMP(char **pArg1, FILE *outFile) {
     unsigned int op = 0;
     unsigned int opcode = 0b1100;
     unsigned int baseR = srInt(pArg1);
@@ -390,30 +312,20 @@ void JMP(char **pArg1,
     outputNumToHexFile(outFile, op);
 }
 
-void JSR(char **pOpcode,
-         char **pArg1,
-         int PC,
-         int symbolTableCnt,
-         FILE *outFile)
-{
+void JSR(char **pOpcode, char **pArg1, int PC, int symbolTableCnt, FILE *outFile) {
     // This includes JSR & JSRR
     unsigned int op = 0;
     unsigned int opcode = 0b0100;
 
-    if (strcmp(*pOpcode, "jsrr") == 0)
-    {
+    if (strcmp(*pOpcode, "jsrr") == 0) {
         unsigned int baseR = srInt(pArg1);
         op = opcode << 12 | (0b000) << 9 | baseR << 6 | 0b0;
-    }
-    else
-    {
+    } else {
         // LABEL
         int jumpPC = -1;
-        for (int i = 0; i < symbolTableCnt; i++)
-        {
+        for (int i = 0; i < symbolTableCnt; i++) {
             TableEntry te = symbolTable[i];
-            if (strcmp(*pArg1, te.label) == 0)
-            {
+            if (strcmp(*pArg1, te.label) == 0) {
                 jumpPC = te.address;
                 break;
             }
@@ -429,11 +341,7 @@ void JSR(char **pOpcode,
 }
 
 // TODO: check pArg3 limit
-void LDB(char **pArg1,
-         char **pArg2,
-         char **pArg3,
-         FILE *outFile)
-{
+void LDB(char **pArg1, char **pArg2, char **pArg3, FILE *outFile) {
     unsigned int op = 0;
     unsigned int opcode = 0b0010;
     unsigned int dr = drInt(pArg1);
@@ -445,11 +353,7 @@ void LDB(char **pArg1,
 }
 
 // TODO: check pArg3 limit
-void LDW(char **pArg1,
-         char **pArg2,
-         char **pArg3,
-         FILE *outFile)
-{
+void LDW(char **pArg1, char **pArg2, char **pArg3, FILE *outFile) {
     unsigned int op = 0;
     unsigned int opcode = 0b0110;
     unsigned int dr = drInt(pArg1);
@@ -460,22 +364,15 @@ void LDW(char **pArg1,
     outputNumToHexFile(outFile, op);
 }
 
-void LEA(char **pArg1,
-         char **pArg2,
-         int PC,
-         int symbolTableCnt,
-         FILE *outFile)
-{
+void LEA(char **pArg1, char **pArg2, int PC, int symbolTableCnt, FILE *outFile) {
     unsigned int op = 0;
     unsigned int opcode = 0b1110;
     unsigned int dr = drInt(pArg1);
     // LABEL
     int jumpPC = -1;
-    for (int i = 0; i < symbolTableCnt; i++)
-    {
+    for (int i = 0; i < symbolTableCnt; i++) {
         TableEntry te = symbolTable[i];
-        if (strcmp(*pArg2, te.label) == 0)
-        {
+        if (strcmp(*pArg2, te.label) == 0) {
             jumpPC = te.address;
             break;
         }
@@ -489,15 +386,11 @@ void LEA(char **pArg1,
     outputNumToHexFile(outFile, op);
 }
 
-void NOP(FILE *outFile)
-{
+void NOP(FILE *outFile) {
     outputNumToHexFile(outFile, 0x0000);
 }
 
-void NOT(char **pArg1,
-         char **pArg2,
-         FILE *outFile)
-{
+void NOT(char **pArg1, char **pArg2, FILE *outFile) {
     unsigned int op = 0;
     unsigned int opcode = 0b1001;
     unsigned int dr = drInt(pArg1);
@@ -506,22 +399,15 @@ void NOT(char **pArg1,
     outputNumToHexFile(outFile, op);
 }
 
-void RET(FILE *outFile)
-{
+void RET(FILE *outFile) {
     outputNumToHexFile(outFile, 0xC1C0);
 }
 
-void RTI(FILE *outFile)
-{
+void RTI(FILE *outFile) {
     outputNumToHexFile(outFile, 0x8000);
 }
 
-void SHF(char **pArg1,
-         char **pArg2,
-         char **pArg3,
-         int shiftOption,
-         FILE *outFile)
-{
+void SHF(char **pArg1, char **pArg2, char **pArg3, int shiftOption, FILE *outFile) {
     unsigned int op = 0;
     unsigned int opcode = 0b1101;
     unsigned int dr = drInt(pArg1);
@@ -533,11 +419,7 @@ void SHF(char **pArg1,
     outputNumToHexFile(outFile, op);
 }
 
-void STB(char **pArg1,
-         char **pArg2,
-         char **pArg3,
-         FILE *outFile)
-{
+void STB(char **pArg1, char **pArg2, char **pArg3, FILE *outFile) {
     unsigned int op = 0;
     unsigned int opcode = 0b0011;
     unsigned int sr = srInt(pArg1);
@@ -548,11 +430,7 @@ void STB(char **pArg1,
     outputNumToHexFile(outFile, op);
 }
 
-void STW(char **pArg1,
-         char **pArg2,
-         char **pArg3,
-         FILE *outFile)
-{
+void STW(char **pArg1, char **pArg2, char **pArg3, FILE *outFile) {
     unsigned int op = 0;
     unsigned int opcode = 0b0111;
     unsigned int sr = srInt(pArg1);
@@ -563,9 +441,7 @@ void STW(char **pArg1,
     outputNumToHexFile(outFile, op);
 }
 
-void TRAP(char **pArg1,
-          FILE *outFile)
-{
+void TRAP(char **pArg1, FILE *outFile) {
     unsigned int op = 0;
     unsigned int opcode = 0b1111;
     // TODO: check number limit
@@ -574,43 +450,31 @@ void TRAP(char **pArg1,
     outputNumToHexFile(outFile, op);
 }
 
-void HALT(FILE *outFile)
-{
+void HALT(FILE *outFile) {
     char *trapvect = (char *)malloc(5 * sizeof(char));
     strcpy(trapvect, "x25");
     TRAP(&trapvect, outFile);
     free(trapvect);
 }
 
-void XOR(char **pArg1,
-         char **pArg2,
-         char **pArg3,
-         FILE *outFile)
-{
+void XOR(char **pArg1, char **pArg2, char **pArg3, FILE *outFile) {
     unsigned int op = 0;
     unsigned int opcode = 0b1001;
     unsigned int dr = drInt(pArg1);
     unsigned int sr1 = srInt(pArg2);
-    if (*pArg3[0] == 'r')
-    {
+    if (*pArg3[0] == 'r') {
         unsigned int sr2 = srInt(pArg3);
         op = opcode << 12 | dr << 9 | sr1 << 6 | (0b000) << 3 | sr2;
-    }
-    else if (*pArg3[0] == '#' || *pArg3[0] == 'x' || *pArg3[0] == 'X')
-    {
+    } else if (*pArg3[0] == '#' || *pArg3[0] == 'x' || *pArg3[0] == 'X') {
         unsigned int imme5 = toNum(*pArg3) & 0x001F;
         op = opcode << 12 | dr << 9 | sr1 << 6 | (0b1) << 5 | (imme5);
-    }
-    else
-    {
+    } else {
         // TODO: throw error
     }
     outputNumToHexFile(outFile, op);
 }
 
-void PS_FILL(char **pArg1,
-             FILE *outFile)
-{
+void PS_FILL(char **pArg1, FILE *outFile) {
     // TODO: check unsigned number
     // TODO: check memory limit
     // TODO: check number limit
@@ -619,8 +483,7 @@ void PS_FILL(char **pArg1,
     outputNumToHexFile(outFile, num);
 }
 
-void firstPass(FILE *infile, int *symbolTableCnt)
-{
+void firstPass(FILE *infile, int *symbolTableCnt) {
 
     char *pLine = (char *)malloc(255 * sizeof(char));
     char **pLabel = (char **)malloc(1 * sizeof(char *));
@@ -641,24 +504,19 @@ void firstPass(FILE *infile, int *symbolTableCnt)
                pArg1,
                pArg2,
                pArg3,
-               pArg4) != DONE)
-    {
-        if (strncmp(".end", *pOpcode, 4) == 0)
-        {
+               pArg4) != DONE) {
+        if (strncmp(".end", *pOpcode, 4) == 0) {
             break;
         }
-        if (programBegin == FALSE && strncmp(".orig", *pOpcode, 5) == 0)
-        {
+        if (programBegin == FALSE && strncmp(".orig", *pOpcode, 5) == 0) {
             programBegin = TRUE;
             programCounter = toNum(*pArg1) - 2; /* .orig pseudo program counter is the value minus 1 instruction spac*/
             continue;
         }
-        if (programBegin == TRUE && (strlen(*pLabel) > 0 || strlen(*pOpcode) > 0))
-        {
+        if (programBegin == TRUE && (strlen(*pLabel) > 0 || strlen(*pOpcode) > 0)) {
             programCounter += 2;
         }
-        if (programBegin == TRUE && strlen(*pLabel) > 0)
-        {
+        if (programBegin == TRUE && strlen(*pLabel) > 0) {
             TableEntry te;
             te.address = programCounter;
             strcpy(te.label, *pLabel);
@@ -677,8 +535,7 @@ void firstPass(FILE *infile, int *symbolTableCnt)
     free(pArg4);
 }
 
-void secondPass(FILE *infile, FILE *outFile, int *symbolTableCnt)
-{
+void secondPass(FILE *infile, FILE *outFile, int *symbolTableCnt) {
     char *pLine = (char *)malloc(255 * sizeof(char));
     char **pLabel = (char **)malloc(1 * sizeof(char *));
     char **pOpcode = (char **)malloc(1 * sizeof(char *));
@@ -698,106 +555,61 @@ void secondPass(FILE *infile, FILE *outFile, int *symbolTableCnt)
                pArg1,
                pArg2,
                pArg3,
-               pArg4) != DONE)
-    {
-        if (programBegin == FALSE && strncmp(".orig", *pOpcode, 5) == 0)
-        {
+               pArg4) != DONE) {
+        if (programBegin == FALSE && strncmp(".orig", *pOpcode, 5) == 0) {
             programBegin = TRUE;
             outputNumToHexFile(outFile, toNum(*pArg1));
             programCounter = toNum(*pArg1) - 2; /* .orig pseudo program counter is the value minus 1 instruction spac*/
             continue;
         }
-        if (programBegin == TRUE && strlen(*pOpcode) > 0)
-        {
+        if (programBegin == TRUE && strlen(*pOpcode) > 0) {
             programCounter += 2;
             if (strncmp("add", *pOpcode, 3) == 0)
-            {
                 ADD(pArg1, pArg2, pArg3, outFile);
-            }
             else if (strncmp("and", *pOpcode, 3) == 0)
-            {
                 AND(pArg1, pArg2, pArg3, outFile);
-            }
             else if (strncmp("br", *pOpcode, 2) == 0)
-            {
                 BR(pOpcode, pArg1, programCounter, *symbolTableCnt, outFile);
-            }
             else if (strncmp("halt", *pOpcode, 4) == 0)
-            {
                 HALT(outFile);
-            }
             else if (strncmp("jmp", *pOpcode, 3) == 0)
-            {
                 JMP(pArg1, outFile);
-            }
             else if (strncmp("jsr", *pOpcode, 3) == 0)
-            {
                 JSR(pOpcode, pArg1, programCounter, *symbolTableCnt, outFile);
-            }
             else if (strncmp("ldb", *pOpcode, 3) == 0)
-            {
                 LDB(pArg1, pArg2, pArg3, outFile);
-            }
             else if (strncmp("ldw", *pOpcode, 3) == 0)
-            {
                 LDW(pArg1, pArg2, pArg3, outFile);
-            }
             else if (strncmp("lea", *pOpcode, 3) == 0)
-            {
                 LEA(pArg1, pArg2, programCounter, *symbolTableCnt, outFile);
-            }
             else if (strncmp("nop", *pOpcode, 3) == 0)
-            {
                 NOP(outFile);
-            }
             else if (strncmp("not", *pOpcode, 3) == 0)
-            {
                 NOT(pArg1, pArg2, outFile);
-            }
             else if (strncmp("ret", *pOpcode, 3) == 0)
-            {
                 RET(outFile);
-            }
             else if (strncmp("rti", *pOpcode, 3) == 0)
-            {
                 RTI(outFile);
-            }
             else if (strncmp("lshf", *pOpcode, 4) == 0)
-            {
                 SHF(pArg1, pArg2, pArg3, 0, outFile);
-            }
             else if (strncmp("rshfl", *pOpcode, 5) == 0)
-            {
                 SHF(pArg1, pArg2, pArg3, 1, outFile);
-            }
             else if (strncmp("rshfa", *pOpcode, 5) == 0)
-            {
                 SHF(pArg1, pArg2, pArg3, 3, outFile);
-            }
             else if (strncmp("stb", *pOpcode, 3) == 0)
-            {
                 STB(pArg1, pArg2, pArg3, outFile);
-            }
             else if (strncmp("stw", *pOpcode, 3) == 0)
-            {
                 STW(pArg1, pArg2, pArg3, outFile);
-            }
             else if (strncmp("trap", *pOpcode, 4) == 0)
-            {
                 TRAP(pArg1, outFile);
-            }
             else if (strncmp("xor", *pOpcode, 3) == 0)
-            {
                 XOR(pArg1, pArg2, pArg3, outFile);
-            }
             else if (strncmp(".fill", *pOpcode, 4) == 0)
-            {
                 PS_FILL(pArg1, outFile);
-            }
             else if (strncmp(".end", *pOpcode, 4) == 0)
-            {
                 break;
-            }
+            else
+                break; // TODO: throw error
         }
     };
 
@@ -810,8 +622,7 @@ void secondPass(FILE *infile, FILE *outFile, int *symbolTableCnt)
     free(pArg4);
 }
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     // Opening Files
     FILE *infile = NULL;
     FILE *outfile = NULL;
@@ -819,13 +630,11 @@ int main(int argc, char *argv[])
     infile = fopen(argv[1], "r");
     outfile = fopen(argv[2], "w");
 
-    if (!infile)
-    {
+    if (!infile) {
         printf("Error: Cannot open file %s\n", argv[1]);
         exit(4);
     }
-    if (!outfile)
-    {
+    if (!outfile) {
         printf("Error: Cannot open file %s\n", argv[2]);
         exit(4);
     }
