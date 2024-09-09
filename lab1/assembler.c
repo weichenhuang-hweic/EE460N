@@ -704,6 +704,14 @@ void LEA(char **pArg1,
     free(op);
 }
 
+void NOP(FILE *outFile)
+{
+    char *op = (char *)malloc(17 * sizeof(char));
+    strcpy(op, "0000000000000000");
+    outputBinaryToHexFile(outFile, op);
+    free(op);
+}
+
 void NOT(char **pArg1,
          char **pArg2,
          FILE *outFile)
@@ -989,6 +997,10 @@ void secondPass(FILE *infile, FILE *outFile, int *symbolTableCnt)
             else if (strncmp("lea", *pOpcode, 3) == 0)
             {
                 LEA(pArg1, pArg2, programCounter, *symbolTableCnt, outFile);
+            }
+            else if (strncmp("nop", *pOpcode, 3) == 0)
+            {
+                NOP(outFile);
             }
             else if (strncmp("not", *pOpcode, 3) == 0)
             {
