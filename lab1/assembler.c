@@ -814,6 +814,31 @@ void STW(char **pArg1,
     free(op);
 }
 
+void TRAP(char **pArg1,
+          FILE *outFile)
+{
+    char *op = (char *)malloc(17 * sizeof(char));
+    int cnt = 0;
+    strcpy(op, "1111");
+    cnt += 4;
+    strcpy(op + cnt, "0000");
+    cnt += 4;
+
+    // TODO: check number limit
+    decToBinaryStrCpy(op + cnt, toNum(*pArg1), 8);
+
+    outputBinaryToHexFile(outFile, op);
+    free(op);
+}
+
+void HALT(FILE *outFile)
+{
+    char *trapvect = (char *)malloc(5 * sizeof(char));
+    strcpy(trapvect, "x25");
+    TRAP(&trapvect, outFile);
+    free(trapvect);
+}
+
 void XOR(char **pArg1,
          char **pArg2,
          char **pArg3,
@@ -941,6 +966,10 @@ void secondPass(FILE *infile, FILE *outFile, int *symbolTableCnt)
             {
                 BR(pOpcode, pArg1, programCounter, *symbolTableCnt, outFile);
             }
+            else if (strncmp("halt", *pOpcode, 4) == 0)
+            {
+                HALT(outFile);
+            }
             else if (strncmp("jmp", *pOpcode, 3) == 0)
             {
                 JMP(pArg1, outFile);
@@ -992,6 +1021,10 @@ void secondPass(FILE *infile, FILE *outFile, int *symbolTableCnt)
             else if (strncmp("stw", *pOpcode, 3) == 0)
             {
                 STW(pArg1, pArg2, pArg3, outFile);
+            }
+            else if (strncmp("trap", *pOpcode, 4) == 0)
+            {
+                TRAP(pArg1, outFile);
             }
             else if (strncmp("xor", *pOpcode, 3) == 0)
             {
