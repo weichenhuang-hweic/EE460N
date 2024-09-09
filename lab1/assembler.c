@@ -875,6 +875,19 @@ void XOR(char **pArg1,
     free(op);
 }
 
+void PS_FILL(char **pArg1,
+             FILE *outFile)
+{
+    // TODO: check unsigned number
+    // TODO: check memory limit
+    // TODO: check number limit
+
+    char *op = (char *)malloc(17 * sizeof(char));
+    decToBinaryStrCpy(op, toNum(*pArg1), 16);
+    outputBinaryToHexFile(outFile, op);
+    free(op);
+}
+
 void firstPass(FILE *infile, int *symbolTableCnt)
 {
 
@@ -899,6 +912,10 @@ void firstPass(FILE *infile, int *symbolTableCnt)
                pArg3,
                pArg4) != DONE)
     {
+        if (strncmp(".end", *pOpcode, 4) == 0)
+        {
+            break;
+        }
         if (programBegin == FALSE && strncmp(".orig", *pOpcode, 5) == 0)
         {
             programBegin = TRUE;
@@ -1041,6 +1058,14 @@ void secondPass(FILE *infile, FILE *outFile, int *symbolTableCnt)
             else if (strncmp("xor", *pOpcode, 3) == 0)
             {
                 XOR(pArg1, pArg2, pArg3, outFile);
+            }
+            else if (strncmp(".fill", *pOpcode, 4) == 0)
+            {
+                PS_FILL(pArg1, outFile);
+            }
+            else if (strncmp(".end", *pOpcode, 4) == 0)
+            {
+                break;
             }
         }
     };
