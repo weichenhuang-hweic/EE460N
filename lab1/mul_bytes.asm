@@ -2,10 +2,12 @@
 
 ; Load Unsigned Integer 1 into R0
         LEA R0, UINT1
+        LDW R0, R0, #0
         LDB R0, R0, #0
 
 ; Load Unsigned Integer 2 into R1
         LEA R1, UINT2
+        LDW R1, R1, #0
         LDB R1, R1, #0
 
 ; Do Multiplication (Bitwise); R2 for result; R3 for counting 8 times (8-bit)
@@ -24,6 +26,7 @@ NBIT    ADD R3, R3, #-1
 
 ; Store Result (only lower 8-bit) Back to RESULT
         LEA R0, RESULT
+        LDW R0, R0, #0
         AND R1, R1, #0
         ADD R1, R1, R2
         LSHF R1, R1, #8
@@ -40,6 +43,7 @@ NBIT    ADD R3, R3, #-1
 NOOVER  AND R3, R3, #0
 
 STOREOV LEA R0, OVER
+        LDW R0, R0, #0
         STB R3, R0, #0
 
         HALT
