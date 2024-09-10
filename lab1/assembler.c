@@ -1,5 +1,9 @@
-// Author: Wei-Chen Huang
-// EID: wh9442
+/*
+    Name 1: Wei-Chen Huang
+    Name 2:
+    UTEID 1: wh9442
+    UTEID 2:
+*/
 // Title: Lab 1 - Part I: Write an assembler for the LC-3b Assembly Language
 // Date Begin: 2024/09/02
 
