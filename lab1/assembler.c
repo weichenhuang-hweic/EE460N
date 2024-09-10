@@ -229,7 +229,7 @@ unsigned int srInt(char **pArg) {
     return drInt(pArg);
 }
 
-int pcOffset(char **pLabel, int curPC, int digit) {
+int pcOffset(char **pLabel, int curPC, int digit, int symbolTableCnt) {
     int jumpPC = -1;
     for (int i = 0; i < symbolTableCnt; i++) {
         TableEntry te = symbolTable[i];
@@ -298,7 +298,7 @@ void BR(char **pOpcode, char **pArg1, int PC, int symbolTableCnt, FILE *outFile)
         conditional = 7;
     }
 
-    unsigned int pcOffset9 = pcOffset(pArg1, PC, 9);
+    unsigned int pcOffset9 = pcOffset(pArg1, PC, 9, symbolTableCnt);
 
     op = opcode << 12 | conditional << 9 | (pcOffset9);
     outputNumToHexFile(outFile, op);
@@ -321,7 +321,7 @@ void JSR(char **pOpcode, char **pArg1, int PC, int symbolTableCnt, FILE *outFile
         unsigned int baseR = srInt(pArg1);
         op = opcode << 12 | (0b000) << 9 | baseR << 6 | 0b0;
     } else {
-        unsigned int pcOffset11 = pcOffset(pArg1, PC, 11);
+        unsigned int pcOffset11 = pcOffset(pArg1, PC, 11, symbolTableCnt);
         op = opcode << 12 | (0b1) << 11 | pcOffset11;
     }
 
@@ -356,7 +356,7 @@ void LEA(char **pArg1, char **pArg2, int PC, int symbolTableCnt, FILE *outFile) 
     unsigned int op = 0;
     unsigned int opcode = 0b1110;
     unsigned int dr = drInt(pArg1);
-    unsigned int pcOffset9 = pcOffset(pArg2, PC, 9);
+    unsigned int pcOffset9 = pcOffset(pArg2, PC, 9, symbolTableCnt);
     op = opcode << 12 | dr << 9 | pcOffset9;
 
     outputNumToHexFile(outFile, op);
