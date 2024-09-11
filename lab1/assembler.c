@@ -467,7 +467,7 @@ void firstPass(FILE *infile, int *symbolTableCnt) {
                 programCounter = toNum(pArg1) - 2; /* .orig pseudo program counter is the value minus 1 instruction spac*/
                 continue;
             }
-            if (programBegin == TRUE && (strlen(pLabel) > 0 || strlen(pOpcode) > 0)) {
+            if (programBegin == TRUE && (strlen(pOpcode) > 0)) {
                 programCounter += 2;
             }
             if (programBegin == TRUE && strlen(pLabel) > 0) {
