@@ -10,10 +10,10 @@
         LDW R1, R1, #0
         LDB R1, R1, #0
 
-; Do Multiplication (Bitwise); R2 for result; R3 for counting 8 times (8-bit)
+; Do Multiplication (Bitwise); R2 for result; R3 for counting 7 times (7-bit)
         AND R2, R2, #0
         AND R3, R3, #0
-        ADD R3, R3, #8
+        ADD R3, R3, #7
 
 MULTY   AND R4, R1, #1
         BRz NBIT
@@ -24,17 +24,17 @@ NBIT    ADD R3, R3, #-1
         RSHFL R1, R1, #1
         BRp MULTY
 
-; Store Result (only lower 8-bit) Back to RESULT
+; Store Result (only lower 7-bit) Back to RESULT
         LEA R0, RESULT
         LDW R0, R0, #0
         AND R1, R1, #0
         ADD R1, R1, R2
-        LSHF R1, R1, #8
-        RSHFL R1, R1, #8
+        LSHF R1, R1, #7
+        RSHFL R1, R1, #7
         STB R1, R0, #0
 
-; Check Overflow by R2 > 256 (the upper byte is not zero) and store in R3
-        RSHFL R3, R2, #8
+; Check Overflow by R2 > 127 (the upper byte is not zero) and store in R3
+        RSHFL R3, R2, #7
         BRz NOOVER
         AND R3, R3, #0
         ADD R3, R3, #1
