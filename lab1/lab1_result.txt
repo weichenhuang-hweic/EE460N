@@ -1,0 +1,96 @@
+------------------------
+Grading for wh9442
+------------------------
+====================================================================
+Used command line arguments: 2 points
+An "x" in the "Incorrect" column indicates a test has failed
+
+Part A: Tests for correct assembly (1 each)
+Each is a 3-line assembly file with .ORIG x3000, instruction & .END
+====================================================================
+Test Case               Correct    Your       Incorrect   Points
+                        Output     Output     
+====================================================================
+.ORIG x3000             0x3000     0x3000                 1
+ADD R3, R1, R0          0X1640     0x1640                 1
+ADD R3, R1, x0          0X1660     0x1660                 1
+ADD R6, R2, #15         0X1CAF     0x1CAF                 1
+ADD R3, R1, #-3 ; test  0X167D     0x167D                 1
+ADD R0, R1, #-16        0X1070     0x1070                 1
+AND R6, R6, R6          0X5D86     0x5D86                 1
+AND R4, R5, #1          0X5961     0x5961                 1
+AND R1, R2, x-10        0X52B0     0x52B0                 1
+XOR R2, R3, R6          0X94C6     0x94C6                 1
+XOR R4, R1, #1          0X9861     0x9861                 1
+XOR R0, R2, x-10        0X90B0     0x90B0                 1
+LSHF R1, R2, #15        0XD28F     0xD28F                 1
+LSHF R2, R2, xA         0XD48A     0xD48A                 1
+RSHFL R2, R3, xF        0XD4DF     0xD4DF                 1
+RSHFL R4, R5, x1        0XD951     0xD951                 1
+RSHFA R4, R5, #15       0XD97F     0xD97F                 1
+RSHFA R4, R5, x0        0XD970     0xD970                 1
+label BR  label         0X0FFF     0x0FFF                 1
+label BRn label         0X09FF     0x09FF                 1
+label BRnzp label       0X0FFF     0x0FFF                 1
+label BRnp label        0X0BFF     0x0BFF                 1
+label BRzp label        0x07FF     0x07FF                 1
+label JSR label         0X4FFF     0x4FFF                 1
+JMP  R2 ; test          0XC080     0xC080                 1
+JMP  R0                 0XC000     0xC000                 1
+JSRR R1 ;te;st          0X4040     0x4040                 1
+JSRR R7                 0X41C0     0x41C0                 1
+label LDB R0, R1, #-10  0X2076     0x2076                 1
+LDB R2, R3, #31;        0X24DF     0x24DF                 1
+LDB R3, R4, x-1F        0X2721     0x2721                 1
+LDW R4, R5, #1          0X6941     0x6941                 1
+LDW R5, R6, #31         0X6B9F     0x6B9F                 1
+LDW R6, R1, x-1F        0X6C61     0x6C61                 1
+STB R1, R2, #1          0X3281     0x3281                 1
+STB R2, R3, #31         0X34DF     0x34DF                 1
+STB R3, R4, x-1F        0X3721     0x3721                 1
+STW R4, R5, #1          0X7941     0x7941                 1
+STW R5, R6, #31         0X7B9F     0x7B9F                 1
+STW R6, R7, x-1F        0X7DE1     0x7DE1                 1
+label LEA R7, label     0XEFFF     0xEFFF                 1
+label LEA R1, label     0xE3FF     0xE3FF                 1
+NOT R0, R1              0X907F     0x907F                 1
+NOT R7, R7              0x9FFF     0x9FFF                 1
+RET                     0XC1C0     0xC1C0                 1
+RTI                     0X8000     0x8000                 1
+NOP                     0X0000     0x0000                 1
+TRAP x25                0XF025     0xF025                 1
+TRAP x22                0XF022     0xF022                 1
+HALT                    0XF025     0xF025                 1
+HALT ; comment          0XF025     0xF025                 1
+.FILL x25               0X0025     0x0025                 1
+.FILL #3000             0X0BB8     0x0BB8                 1
+.FILL x-1               0xFFFF     0xFFFF                 1
+.FILL #25000            0x61A8     0x61A8                 1
+
+====================================================================
+Part B: Complete LC-3b assembly files (points vary)
+====================================================================
+Test Case               Errors     Your       Incorrect   Points
+                                   Exit Code  
+====================================================================
+comp                    0          0                      4.0/4.0
+swap                    0          0                      4.0/4.0
+counter                 0          0                      4.0/4.0
+rigorous                0          0                      4.0/4.0
+all                     0          0                      4.0/4.0
+reverse                 0          0                      4.0/4.0
+pc_offset_maxrange      0          0                      4.0/4.0
+
+====================================================================
+Part C: Test cases for the mul_bytes program (points vary)
+====================================================================
+Test Case                            Error               Points
+====================================================================
+Test Case 0                                           3/3
+Test Case 1                                           3/3
+Test Case 2                                           3/3
+Test Case 3                                           3/3
+Test Case 4                                           3/3
+====================================================================
+Assignment 1: Total points 100.0 / 100
+====================================================================
