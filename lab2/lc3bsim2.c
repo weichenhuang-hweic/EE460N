@@ -38,7 +38,8 @@ int SEXT(int imme, int digit);
 void SETCC(int value);
 
 // Instruction Functions
-void ADD();
+void ADD(int OP);
+void AND(int OP);
 
 /***************************************************************/
 /* A couple of useful definitions.                             */
@@ -428,6 +429,8 @@ void process_instruction() {
 
     if (~((OP >> 12) & (0b0001))) {
         ADD(OP);
+    } else if (~((OP >> 12) & (0b0101))) {
+        AND(OP);
     }
 }
 
@@ -478,10 +481,25 @@ void ADD(int OP) {
 
     if (OP & 0x0020) {
         int imme5 = SEXT(IMME5(OP), 5);
-        CURRENT_LATCHES.REGS[dr] = CURRENT_LATCHES.REGS[sr1] | imme5;
+        CURRENT_LATCHES.REGS[dr] = Low16bits(CURRENT_LATCHES.REGS[sr1] + imme5);
     } else {
         int sr2 = SR2(OP);
-        CURRENT_LATCHES.REGS[dr] = CURRENT_LATCHES.REGS[sr1] | CURRENT_LATCHES.REGS[sr2];
+        CURRENT_LATCHES.REGS[dr] = Low16bits(CURRENT_LATCHES.REGS[sr1] + CURRENT_LATCHES.REGS[sr2]);
+    }
+
+    SETCC(CURRENT_LATCHES.REGS[dr]);
+}
+
+void AND(int OP) {
+    int dr = DR(OP);
+    int sr1 = SR1(OP);
+
+    if (OP & 0x0020) {
+        int imme5 = SEXT(IMME5(OP), 5);
+        CURRENT_LATCHES.REGS[dr] = Low16bits(CURRENT_LATCHES.REGS[sr1] & imme5);
+    } else {
+        int sr2 = SR2(OP);
+        CURRENT_LATCHES.REGS[dr] = Low16bits(CURRENT_LATCHES.REGS[sr1] & CURRENT_LATCHES.REGS[sr2]);
     }
 
     SETCC(CURRENT_LATCHES.REGS[dr]);
