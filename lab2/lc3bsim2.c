@@ -1,12 +1,6 @@
 /*
-    Remove all unnecessary lines (including this one)
-    in this comment.
-    REFER TO THE SUBMISSION INSTRUCTION FOR DETAILS
-
-    Name 1: Full name of the first partner
-    Name 2: Full name of the second partner
-    UTEID 1: UT EID of the first partner
-    UTEID 2: UT EID of the second partner
+    Name 1: Wei-Chen Huang
+    UTEID 1: wh9442
 */
 
 /***************************************************************/
@@ -34,6 +28,17 @@
 /***************************************************************/
 
 void process_instruction();
+
+// Aid Functions
+int DR(int OP);
+int SR1(int OP);
+int SR2(int OP);
+int IMME5(int OP);
+int SEXT(int imme, int digit);
+void SETCC(int value);
+
+// Instruction Functions
+void ADD();
 
 /***************************************************************/
 /* A couple of useful definitions.                             */
@@ -415,4 +420,69 @@ void process_instruction() {
      *       -Execute
      *       -Update NEXT_LATCHES
      */
+
+    int PC = CURRENT_LATCHES.PC;
+    int lowerByte = MEMORY[PC >> 1][0];
+    int upperByte = MEMORY[PC >> 1][1];
+    int OP = upperByte << 8 | lowerByte;
+
+    if (~((OP >> 12) & (0b0001))) {
+        ADD(OP);
+    }
+}
+
+int DR(int OP) {
+    return (OP & 0x0E00) >> 9;
+}
+
+int SR1(int OP) {
+    return (OP & 0x01C0) >> 6;
+}
+
+int SR2(int OP) {
+    return (OP & 0x0007);
+}
+
+int IMME5(int OP) {
+    return (OP & 0x001F);
+}
+
+int SEXT(int imme, int digit) {
+    if (imme >> (digit - 1)) {
+        return Low16bits(imme | (0xFFFF << digit));
+    }
+    return Low16bits(imme);
+}
+
+void SETCC(int value) {
+    if (value & 0x8000) {
+        CURRENT_LATCHES.N = 1;
+        CURRENT_LATCHES.Z = 0;
+        CURRENT_LATCHES.P = 0;
+    } else if (value ^ 0) {
+        // Positives
+        CURRENT_LATCHES.N = 0;
+        CURRENT_LATCHES.Z = 0;
+        CURRENT_LATCHES.P = 1;
+    } else {
+        // Zero
+        CURRENT_LATCHES.N = 0;
+        CURRENT_LATCHES.Z = 1;
+        CURRENT_LATCHES.P = 0;
+    }
+}
+
+void ADD(int OP) {
+    int dr = DR(OP);
+    int sr1 = SR1(OP);
+
+    if (OP & 0x0020) {
+        int imme5 = SEXT(IMME5(OP), 5);
+        CURRENT_LATCHES.REGS[dr] = CURRENT_LATCHES.REGS[sr1] | imme5;
+    } else {
+        int sr2 = SR2(OP);
+        CURRENT_LATCHES.REGS[dr] = CURRENT_LATCHES.REGS[sr1] | CURRENT_LATCHES.REGS[sr2];
+    }
+
+    SETCC(CURRENT_LATCHES.REGS[dr]);
 }
