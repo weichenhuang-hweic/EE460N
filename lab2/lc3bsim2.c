@@ -46,6 +46,7 @@ void ADD(int OP);
 void AND(int OP);
 void BR(int OP);
 void JMPRET(int OP);
+void JSRJSRR(int OP);
 
 /***************************************************************/
 /* A couple of useful definitions.                             */
@@ -441,6 +442,8 @@ void process_instruction() {
         BR(OP);
     } else if (~((OP >> 12) & (0b1100))) {
         JMPRET(OP);
+    } else if (~((OP >> 12) & (0b0100))) {
+        JSRJSRR(OP);
     }
 }
 
@@ -559,4 +562,16 @@ void BR(int OP) {
 void JMPRET(int OP) {
     int baseR = BASER(OP);
     UPDATEPC(CURRENT_LATCHES.REGS[baseR]);
+}
+
+void JSRJSRR(int OP) {
+    CURRENT_LATCHES.REGS[7] = CURRENT_LATCHES.PC;
+
+    if (OP & 0x0800) {
+        int pcOffset11 = (OP & 0x07FF);
+        UPDATEPC(PCOFFSET(pcOffset11, 11));
+    } else {
+        int baseR = BASER(OP);
+        UPDATEPC(CURRENT_LATCHES.REGS[baseR]);
+    }
 }
