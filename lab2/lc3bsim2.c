@@ -33,8 +33,10 @@ void process_instruction();
 int DR(int OP);
 int SR1(int OP);
 int SR2(int OP);
+int BASER(int OP);
 int IMME5(int OP);
 int SEXT(int imme, int digit);
+int PCOFFSET(int pcOffset, int digit);
 void SETCC(int value);
 int GETCC();
 void UPDATEPC(int PCNext);
@@ -43,6 +45,7 @@ void UPDATEPC(int PCNext);
 void ADD(int OP);
 void AND(int OP);
 void BR(int OP);
+void JMPRET(int OP);
 
 /***************************************************************/
 /* A couple of useful definitions.                             */
@@ -434,6 +437,10 @@ void process_instruction() {
         ADD(OP);
     } else if (~((OP >> 12) & (0b0101))) {
         AND(OP);
+    } else if (~((OP >> 12) & (0b0000))) {
+        BR(OP);
+    } else if (~((OP >> 12) & (0b1100))) {
+        JMPRET(OP);
     }
 }
 
@@ -449,6 +456,10 @@ int SR2(int OP) {
     return (OP & 0x0007);
 }
 
+int BASER(int OP) {
+    return (OP & 0x01C0) >> 6;
+}
+
 int IMME5(int OP) {
     return (OP & 0x001F);
 }
@@ -460,7 +471,7 @@ int SEXT(int imme, int digit) {
     return Low16bits(imme);
 }
 
-int PCoffset(int pcOffset, int digit) {
+int PCOFFSET(int pcOffset, int digit) {
     int nextPC = CURRENT_LATCHES.PC + 2;
     return Low16bits(nextPC + (SEXT(pcOffset, digit) << 1));
 }
@@ -539,8 +550,13 @@ void BR(int OP) {
     int pcOffset9 = (OP & 0x01FF);
 
     if ((condition ^ 0b0) || (condition & cc)) {
-        UPDATEPC(PCoffset(pcOffset9, 9));
+        UPDATEPC(PCOFFSET(pcOffset9, 9));
     } else {
         UPDATEPC(CURRENT_LATCHES.PC + 2);
     }
+}
+
+void JMPRET(int OP) {
+    int baseR = BASER(OP);
+    UPDATEPC(CURRENT_LATCHES.REGS[baseR]);
 }
