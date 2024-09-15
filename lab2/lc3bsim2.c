@@ -36,10 +36,13 @@ int SR2(int OP);
 int IMME5(int OP);
 int SEXT(int imme, int digit);
 void SETCC(int value);
+int GETCC();
+void UPDATEPC(int PCNext);
 
 // Instruction Functions
 void ADD(int OP);
 void AND(int OP);
+void BR(int OP);
 
 /***************************************************************/
 /* A couple of useful definitions.                             */
@@ -457,22 +460,45 @@ int SEXT(int imme, int digit) {
     return Low16bits(imme);
 }
 
+int PCoffset(int pcOffset, int digit) {
+    int nextPC = CURRENT_LATCHES.PC + 2;
+    return Low16bits(nextPC + (SEXT(pcOffset, digit) << 1));
+}
+
 void SETCC(int value) {
     if (value & 0x8000) {
-        CURRENT_LATCHES.N = 1;
-        CURRENT_LATCHES.Z = 0;
-        CURRENT_LATCHES.P = 0;
+        NEXT_LATCHES.N = 1;
+        NEXT_LATCHES.Z = 0;
+        NEXT_LATCHES.P = 0;
     } else if (value ^ 0) {
         // Positives
-        CURRENT_LATCHES.N = 0;
-        CURRENT_LATCHES.Z = 0;
-        CURRENT_LATCHES.P = 1;
+        NEXT_LATCHES.N = 0;
+        NEXT_LATCHES.Z = 0;
+        NEXT_LATCHES.P = 1;
     } else {
         // Zero
-        CURRENT_LATCHES.N = 0;
-        CURRENT_LATCHES.Z = 1;
-        CURRENT_LATCHES.P = 0;
+        NEXT_LATCHES.N = 0;
+        NEXT_LATCHES.Z = 1;
+        NEXT_LATCHES.P = 0;
     }
+}
+
+int GETCC() {
+    int condition = 0;
+    if (CURRENT_LATCHES.N) {
+        condition += 4;
+    }
+    if (CURRENT_LATCHES.Z) {
+        condition += 2;
+    }
+    if (CURRENT_LATCHES.P) {
+        condition += 1;
+    }
+    return Low16bits(condition);
+}
+
+void UPDATEPC(int PCNext) {
+    NEXT_LATCHES.PC = PCNext;
 }
 
 void ADD(int OP) {
@@ -488,6 +514,7 @@ void ADD(int OP) {
     }
 
     SETCC(CURRENT_LATCHES.REGS[dr]);
+    UPDATEPC(CURRENT_LATCHES.PC + 2);
 }
 
 void AND(int OP) {
@@ -503,4 +530,17 @@ void AND(int OP) {
     }
 
     SETCC(CURRENT_LATCHES.REGS[dr]);
+    UPDATEPC(CURRENT_LATCHES.PC + 2);
+}
+
+void BR(int OP) {
+    int condition = (OP & 0x0E00) >> 9;
+    int cc = GETCC();
+    int pcOffset9 = (OP & 0x01FF);
+
+    if ((condition ^ 0b0) || (condition & cc)) {
+        UPDATEPC(PCoffset(pcOffset9, 9));
+    } else {
+        UPDATEPC(CURRENT_LATCHES.PC + 2);
+    }
 }
