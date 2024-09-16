@@ -518,11 +518,11 @@ int BOFFSET(int bOffset, int digit) {
 }
 
 int OFFSET(int offset, int digit) {
-    return Low16bits(SEXT(offset, digit) >> 1);
+    return Low16bits(SEXT(offset, digit) << 1);
 }
 
 int TRAPVECT8(int trapvect8) {
-    return Low16bits(trapvect8 >> 1);
+    return Low16bits(trapvect8 << 1);
 }
 
 void SETCC(int value) {
@@ -635,8 +635,7 @@ void LDB(int OP) {
     int dr = DR(OP);
     int baseR = BASER(OP);
     int bOffset6 = (OP & 0x003F);
-    int address = CURRENT_LATCHES.REGS[baseR] + BOFFSET(bOffset6, 6);
-    // TODO: check lower byte or high byte
+    int address = Low16bits(CURRENT_LATCHES.REGS[baseR] + BOFFSET(bOffset6, 6));
     int lowerByte = MEMORY[address >> 1][0];
     int upperByte = MEMORY[address >> 1][1];
 
@@ -654,7 +653,7 @@ void LDW(int OP) {
     int dr = DR(OP);
     int baseR = BASER(OP);
     int offset6 = (OP & 0x003F);
-    int address = CURRENT_LATCHES.REGS[baseR] + OFFSET(offset6, 6);
+    int address = Low16bits(CURRENT_LATCHES.REGS[baseR] + OFFSET(offset6, 6));
     int lowerByte = MEMORY[address >> 1][0];
     int upperByte = MEMORY[address >> 1][1];
     int value = Low16bits((upperByte << 8) | lowerByte);
@@ -722,7 +721,7 @@ void STW(int OP) {
     int sr = DR(OP);
     int baseR = BASER(OP);
     int offset6 = (OP & 0x003F);
-    int address = CURRENT_LATCHES.REGS[baseR] + OFFSET(offset6, 6);
+    int address = Low16bits(CURRENT_LATCHES.REGS[baseR] + OFFSET(offset6, 6));
 
     MEMORY[address >> 1][1] = (CURRENT_LATCHES.REGS[sr] >> 8) & 0x00FF;
     MEMORY[address >> 1][0] = CURRENT_LATCHES.REGS[sr] & 0x00FF;
