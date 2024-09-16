@@ -41,6 +41,7 @@ int SEXT(int imme, int digit);
 int PCOFFSET(int pcOffset, int digit);
 int BOFFSET(int bOffset, int digit);
 int OFFSET(int offset, int digit);
+int TRAPVECT8(int trapvect8);
 void SETCC(int value);
 int GETCC();
 void UPDATEPC(int PCNext);
@@ -58,7 +59,7 @@ void LEA(int OP);
 void SHF(int OP);
 void STB(int OP);
 void STW(int OP);
-// TODO: TRAP
+void TRAP(int OP);
 void XORNOT(int OP);
 
 /***************************************************************/
@@ -469,6 +470,8 @@ void process_instruction() {
         STB(OP);
     } else if (~((OP >> 12) & (0b0111))) {
         STW(OP);
+    } else if (~((OP >> 12) & (0b1111))) {
+        TRAP(OP);
     } else if (~((OP >> 12) & (0b1001))) {
         XORNOT(OP);
     }
@@ -512,6 +515,10 @@ int BOFFSET(int bOffset, int digit) {
 
 int OFFSET(int offset, int digit) {
     return Low16bits(SEXT(offset, digit) >> 1);
+}
+
+int TRAPVECT8(int trapvect8) {
+    return Low16bits(trapvect8 >> 1);
 }
 
 void SETCC(int value) {
@@ -711,6 +718,17 @@ void STW(int OP) {
     MEMORY[address >> 1][0] = CURRENT_LATCHES.REGS[sr] & 0x00FF;
 
     UPDATEPC(CURRENT_LATCHES.PC + 2);
+}
+
+void TRAP(int OP) {
+    CURRENT_LATCHES.REGS[7] = CURRENT_LATCHES.PC + 2;
+
+    int address = TRAPVECT8((OP & 0x00FF));
+    int lowerByte = MEMORY[address >> 1][0];
+    int upperByte = MEMORY[address >> 1][1];
+    int value = Low16bits((upperByte << 8) | lowerByte);
+
+    UPDATEPC(value);
 }
 
 void XORNOT(int OP) {
