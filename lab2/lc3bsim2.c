@@ -51,6 +51,7 @@ void JMPRET(int OP);
 void JSRJSRR(int OP);
 void LDB(int OP);
 void LDW(int OP);
+void LEA(int OP);
 
 /***************************************************************/
 /* A couple of useful definitions.                             */
@@ -581,7 +582,8 @@ void JMPRET(int OP) {
 }
 
 void JSRJSRR(int OP) {
-    CURRENT_LATCHES.REGS[7] = CURRENT_LATCHES.PC;
+    // NOTE: JSR/JSRR Operation definition changed in document
+    int tempPCNext = CURRENT_LATCHES.PC + 2;
 
     if (OP & 0x0800) {
         int pcOffset11 = (OP & 0x07FF);
@@ -590,13 +592,15 @@ void JSRJSRR(int OP) {
         int baseR = BASER(OP);
         UPDATEPC(CURRENT_LATCHES.REGS[baseR]);
     }
+
+    CURRENT_LATCHES.REGS[7] = tempPCNext;
 }
 
 void LDB(int OP) {
     int dr = DR(OP);
     int baseR = BASER(OP);
-    int bOffset6 = BOFFSET((OP & 0x003F), 6);
-    int address = baseR + bOffset6;
+    int bOffset6 = (OP & 0x003F);
+    int address = baseR + BOFFSET(bOffset6, 6);
     // TODO: check lower byte or high byte
     int lowerByte = MEMORY[address >> 1][0];
     int upperByte = MEMORY[address >> 1][1];
@@ -607,19 +611,31 @@ void LDB(int OP) {
         CURRENT_LATCHES.REGS[dr] = SEXT(lowerByte, 8);
     }
 
+    SETCC(CURRENT_LATCHES.REGS[dr]);
     UPDATEPC(CURRENT_LATCHES.PC + 2);
 }
 
 void LDW(int OP) {
     int dr = DR(OP);
     int baseR = BASER(OP);
-    int offset6 = OFFSET((OP & 0x003F), 6);
-    int address = baseR + offset6;
+    int offset6 = (OP & 0x003F);
+    int address = baseR + OFFSET(offset6, 6);
     int lowerByte = MEMORY[address >> 1][0];
     int upperByte = MEMORY[address >> 1][1];
     int value = Low16bits((upperByte << 8) | lowerByte);
 
     CURRENT_LATCHES.REGS[dr] = value;
 
+    SETCC(CURRENT_LATCHES.REGS[dr]);
+    UPDATEPC(CURRENT_LATCHES.PC + 2);
+}
+
+void LEA(int OP) {
+    int dr = DR(OP);
+    int pcOffset9 = (OP & 0x01FF);
+
+    CURRENT_LATCHES.REGS[dr] = PCOFFSET(pcOffset9, 9);
+
+    // NOTE: LEA does not SETCC according to document
     UPDATEPC(CURRENT_LATCHES.PC + 2);
 }
