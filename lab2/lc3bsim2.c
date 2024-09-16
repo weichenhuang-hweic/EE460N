@@ -58,6 +58,8 @@ void LEA(int OP);
 void SHF(int OP);
 void STB(int OP);
 void STW(int OP);
+// TODO: TRAP
+void XORNOT(int OP);
 
 /***************************************************************/
 /* A couple of useful definitions.                             */
@@ -467,6 +469,8 @@ void process_instruction() {
         STB(OP);
     } else if (~((OP >> 12) & (0b0111))) {
         STW(OP);
+    } else if (~((OP >> 12) & (0b1001))) {
+        XORNOT(OP);
     }
 }
 
@@ -706,5 +710,21 @@ void STW(int OP) {
     MEMORY[address >> 1][1] = (CURRENT_LATCHES.REGS[sr] >> 8) & 0x00FF;
     MEMORY[address >> 1][0] = CURRENT_LATCHES.REGS[sr] & 0x00FF;
 
+    UPDATEPC(CURRENT_LATCHES.PC + 2);
+}
+
+void XORNOT(int OP) {
+    int dr = DR(OP);
+    int sr1 = SR1(OP);
+
+    if (OP & 0x0020) {
+        int imme5 = SEXT(IMME5(OP), 5);
+        CURRENT_LATCHES.REGS[dr] = Low16bits(CURRENT_LATCHES.REGS[sr1] ^ imme5);
+    } else {
+        int sr2 = SR2(OP);
+        CURRENT_LATCHES.REGS[dr] = Low16bits(CURRENT_LATCHES.REGS[sr1] ^ CURRENT_LATCHES.REGS[sr2]);
+    }
+
+    SETCC(CURRENT_LATCHES.REGS[dr]);
     UPDATEPC(CURRENT_LATCHES.PC + 2);
 }
