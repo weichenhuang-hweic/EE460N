@@ -28,6 +28,7 @@
 /***************************************************************/
 
 // TODO: check left-shift, right-shift (C built-in) is logic or arithmetic
+// TODO: check ! could be replace or not
 
 void process_instruction();
 
@@ -45,6 +46,7 @@ int TRAPVECT8(int trapvect8);
 void SETCC(int value);
 int GETCC();
 void UPDATEPC(int PCNext);
+void UPDATEREG();
 
 // Instruction Functions
 // NOTE: Skip RTI according to document
@@ -448,33 +450,35 @@ void process_instruction() {
     int upperByte = MEMORY[PC >> 1][1];
     int OP = upperByte << 8 | lowerByte;
 
-    if (~((OP >> 12) & (0b0001))) {
+    if (!((OP >> 12) ^ (0b0001))) {
         ADD(OP);
-    } else if (~((OP >> 12) & (0b0101))) {
+    } else if (!((OP >> 12) ^ (0b0101))) {
         AND(OP);
-    } else if (~((OP >> 12) & (0b0000))) {
+    } else if (!((OP >> 12) ^ (0b0000))) {
         BR(OP);
-    } else if (~((OP >> 12) & (0b1100))) {
+    } else if (!((OP >> 12) ^ (0b1100))) {
         JMPRET(OP);
-    } else if (~((OP >> 12) & (0b0100))) {
+    } else if (!((OP >> 12) ^ (0b0100))) {
         JSRJSRR(OP);
-    } else if (~((OP >> 12) & (0b0010))) {
+    } else if (!((OP >> 12) ^ (0b0010))) {
         LDB(OP);
-    } else if (~((OP >> 12) & (0b0110))) {
+    } else if (!((OP >> 12) ^ (0b0110))) {
         LDW(OP);
-    } else if (~((OP >> 12) & (0b1110))) {
+    } else if (!((OP >> 12) ^ (0b1110))) {
         LEA(OP);
-    } else if (~((OP >> 12) & (0b1101))) {
+    } else if (!((OP >> 12) ^ (0b1101))) {
         SHF(OP);
-    } else if (~((OP >> 12) & (0b0011))) {
+    } else if (!((OP >> 12) ^ (0b0011))) {
         STB(OP);
-    } else if (~((OP >> 12) & (0b0111))) {
+    } else if (!((OP >> 12) ^ (0b0111))) {
         STW(OP);
-    } else if (~((OP >> 12) & (0b1111))) {
+    } else if (!((OP >> 12) ^ (0b1111))) {
         TRAP(OP);
-    } else if (~((OP >> 12) & (0b1001))) {
+    } else if (!((OP >> 12) ^ (0b1001))) {
         XORNOT(OP);
     }
+
+    UPDATEREG();
 }
 
 int DR(int OP) {
@@ -557,6 +561,12 @@ void UPDATEPC(int PCNext) {
     NEXT_LATCHES.PC = PCNext;
 }
 
+void UPDATEREG() {
+    for (int i = 0; i < LC_3b_REGS; i++) {
+        NEXT_LATCHES.REGS[i] = CURRENT_LATCHES.REGS[i];
+    }
+}
+
 void ADD(int OP) {
     int dr = DR(OP);
     int sr1 = SR1(OP);
@@ -594,7 +604,7 @@ void BR(int OP) {
     int cc = GETCC();
     int pcOffset9 = (OP & 0x01FF);
 
-    if ((condition ^ 0b0) || (condition & cc)) {
+    if (!(condition ^ 0b0) || (condition & cc)) {
         UPDATEPC(PCOFFSET(pcOffset9, 9));
     } else {
         UPDATEPC(CURRENT_LATCHES.PC + 2);
@@ -625,12 +635,12 @@ void LDB(int OP) {
     int dr = DR(OP);
     int baseR = BASER(OP);
     int bOffset6 = (OP & 0x003F);
-    int address = baseR + BOFFSET(bOffset6, 6);
+    int address = CURRENT_LATCHES.REGS[baseR] + BOFFSET(bOffset6, 6);
     // TODO: check lower byte or high byte
     int lowerByte = MEMORY[address >> 1][0];
     int upperByte = MEMORY[address >> 1][1];
 
-    if (OP & 0x0001) {
+    if (address & 0x0001) {
         CURRENT_LATCHES.REGS[dr] = SEXT(upperByte, 8);
     } else {
         CURRENT_LATCHES.REGS[dr] = SEXT(lowerByte, 8);
@@ -644,7 +654,7 @@ void LDW(int OP) {
     int dr = DR(OP);
     int baseR = BASER(OP);
     int offset6 = (OP & 0x003F);
-    int address = baseR + OFFSET(offset6, 6);
+    int address = CURRENT_LATCHES.REGS[baseR] + OFFSET(offset6, 6);
     int lowerByte = MEMORY[address >> 1][0];
     int upperByte = MEMORY[address >> 1][1];
     int value = Low16bits((upperByte << 8) | lowerByte);
@@ -670,12 +680,12 @@ void SHF(int OP) {
     int sr = SR1(OP);
     int amount4 = (OP & 0x000F);
 
-    if (~(OP & 0x0010)) {
-        CURRENT_LATCHES.REGS[dr] = CURRENT_LATCHES.REGS[sr] << amount4;
+    if (!(OP & 0x0010)) {
+        CURRENT_LATCHES.REGS[dr] = Low16bits(CURRENT_LATCHES.REGS[sr] << amount4);
     } else {
-        if (~(OP & 0x0020)) {
+        if (!(OP & 0x0020)) {
             // Logic Right Shift
-            CURRENT_LATCHES.REGS[dr] = CURRENT_LATCHES.REGS[sr] >> amount4;
+            CURRENT_LATCHES.REGS[dr] = Low16bits(CURRENT_LATCHES.REGS[sr] >> amount4);
         } else {
             // Arithmetic Right Shift
             int RSHF = CURRENT_LATCHES.REGS[sr] >> amount4;
@@ -695,9 +705,9 @@ void STB(int OP) {
     int sr = DR(OP);
     int baseR = BASER(OP);
     int bOffset6 = (OP & 0x003F);
-    int address = baseR + BOFFSET(bOffset6, 6);
+    int address = Low16bits(CURRENT_LATCHES.REGS[baseR] + BOFFSET(bOffset6, 6));
 
-    if (OP & 0x0001) {
+    if (address & 0x0001) {
         // Upper Byte
         MEMORY[address >> 1][1] = CURRENT_LATCHES.REGS[sr] & 0x00FF;
     } else {
@@ -712,7 +722,7 @@ void STW(int OP) {
     int sr = DR(OP);
     int baseR = BASER(OP);
     int offset6 = (OP & 0x003F);
-    int address = baseR + OFFSET(offset6, 6);
+    int address = CURRENT_LATCHES.REGS[baseR] + OFFSET(offset6, 6);
 
     MEMORY[address >> 1][1] = (CURRENT_LATCHES.REGS[sr] >> 8) & 0x00FF;
     MEMORY[address >> 1][0] = CURRENT_LATCHES.REGS[sr] & 0x00FF;
