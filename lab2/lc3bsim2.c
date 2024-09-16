@@ -688,9 +688,9 @@ void SHF(int OP) {
             CURRENT_LATCHES.REGS[dr] = Low16bits(CURRENT_LATCHES.REGS[sr] >> amount4);
         } else {
             // Arithmetic Right Shift
-            int RSHF = CURRENT_LATCHES.REGS[sr] >> amount4;
+            int RSHF = Low16bits(CURRENT_LATCHES.REGS[sr] >> amount4);
             if (CURRENT_LATCHES.REGS[sr] & 0x8000) {
-                CURRENT_LATCHES.REGS[dr] = Low16bits(RSHF | (0xFFFF << amount4));
+                CURRENT_LATCHES.REGS[dr] = Low16bits(RSHF | (0xFFFF << (16 - amount4)));
             } else {
                 CURRENT_LATCHES.REGS[dr] = Low16bits(RSHF);
             }
