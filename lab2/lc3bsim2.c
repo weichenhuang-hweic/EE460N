@@ -37,6 +37,7 @@ int BASER(int OP);
 int IMME5(int OP);
 int SEXT(int imme, int digit);
 int PCOFFSET(int pcOffset, int digit);
+int BOFFSET(int bOffset, int digit);
 void SETCC(int value);
 int GETCC();
 void UPDATEPC(int PCNext);
@@ -47,6 +48,7 @@ void AND(int OP);
 void BR(int OP);
 void JMPRET(int OP);
 void JSRJSRR(int OP);
+void LDB(int OP);
 
 /***************************************************************/
 /* A couple of useful definitions.                             */
@@ -444,6 +446,8 @@ void process_instruction() {
         JMPRET(OP);
     } else if (~((OP >> 12) & (0b0100))) {
         JSRJSRR(OP);
+    } else if (~((OP >> 12) & (0b0010))) {
+        LDB(OP);
     }
 }
 
@@ -477,6 +481,10 @@ int SEXT(int imme, int digit) {
 int PCOFFSET(int pcOffset, int digit) {
     int nextPC = CURRENT_LATCHES.PC + 2;
     return Low16bits(nextPC + (SEXT(pcOffset, digit) << 1));
+}
+
+int BOFFSET(int bOffset, int digit) {
+    return Low16bits(SEXT(bOffset, digit));
 }
 
 void SETCC(int value) {
@@ -574,4 +582,24 @@ void JSRJSRR(int OP) {
         int baseR = BASER(OP);
         UPDATEPC(CURRENT_LATCHES.REGS[baseR]);
     }
+}
+
+void LDB(int OP) {
+    int dr = DR(OP);
+    int baseR = BASER(OP);
+    int bOffset6 = BOFFSET((OP & 0x003F), 6);
+
+    int address = baseR + bOffset6;
+
+    // TODO: check lower byte or high byte
+    int lowerByte = MEMORY[address >> 1][0];
+    int upperByte = MEMORY[address >> 1][1];
+
+    if (OP & 0x0001) {
+        CURRENT_LATCHES.REGS[dr] = SEXT(upperByte, 8);
+    } else {
+        CURRENT_LATCHES.REGS[dr] = SEXT(lowerByte, 8);
+    }
+
+    UPDATEPC(CURRENT_LATCHES.PC + 2);
 }
