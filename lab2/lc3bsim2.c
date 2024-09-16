@@ -27,6 +27,8 @@
 /* These are the functions you'll have to write.               */
 /***************************************************************/
 
+// TODO: check left-shift, right-shift (C built-in) is logic or arithmetic
+
 void process_instruction();
 
 // Aid Functions
@@ -44,6 +46,7 @@ int GETCC();
 void UPDATEPC(int PCNext);
 
 // Instruction Functions
+// NOTE: Skip RTI according to document
 void ADD(int OP);
 void AND(int OP);
 void BR(int OP);
@@ -52,6 +55,7 @@ void JSRJSRR(int OP);
 void LDB(int OP);
 void LDW(int OP);
 void LEA(int OP);
+void SHF(int OP);
 
 /***************************************************************/
 /* A couple of useful definitions.                             */
@@ -453,6 +457,10 @@ void process_instruction() {
         LDB(OP);
     } else if (~((OP >> 12) & (0b0110))) {
         LDW(OP);
+    } else if (~((OP >> 12) & (0b1110))) {
+        LEA(OP);
+    } else if (~((OP >> 12) & (0b1101))) {
+        SHF(OP);
     }
 }
 
@@ -638,4 +646,29 @@ void LEA(int OP) {
 
     // NOTE: LEA does not SETCC according to document
     UPDATEPC(CURRENT_LATCHES.PC + 2);
+}
+
+void SHF(int OP) {
+    int dr = DR(OP);
+    int sr = SR1(OP);
+    int amount4 = (OP & 0x000F);
+
+    if (~(OP & 0x0010)) {
+        CURRENT_LATCHES.REGS[dr] = CURRENT_LATCHES.REGS[sr] << amount4;
+    } else {
+        if (~(OP & 0x0020)) {
+            // Logic Right Shift
+            CURRENT_LATCHES.REGS[dr] = CURRENT_LATCHES.REGS[sr] >> amount4;
+        } else {
+            // Arithmetic Right Shift
+            int RSHF = CURRENT_LATCHES.REGS[sr] >> amount4;
+            if (CURRENT_LATCHES.REGS[sr] & 0x8000) {
+                CURRENT_LATCHES.REGS[dr] = Low16bits(RSHF | (0xFFFF << amount4));
+            } else {
+                CURRENT_LATCHES.REGS[dr] = Low16bits(RSHF);
+            }
+        }
+    }
+
+    SETCC(CURRENT_LATCHES.REGS[dr]);
 }
