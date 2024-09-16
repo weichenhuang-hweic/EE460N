@@ -57,6 +57,7 @@ void LDW(int OP);
 void LEA(int OP);
 void SHF(int OP);
 void STB(int OP);
+void STW(int OP);
 
 /***************************************************************/
 /* A couple of useful definitions.                             */
@@ -464,6 +465,8 @@ void process_instruction() {
         SHF(OP);
     } else if (~((OP >> 12) & (0b0011))) {
         STB(OP);
+    } else if (~((OP >> 12) & (0b0111))) {
+        STW(OP);
     }
 }
 
@@ -690,6 +693,18 @@ void STB(int OP) {
         // Lower Byte
         MEMORY[address >> 1][0] = CURRENT_LATCHES.REGS[sr] & 0x00FF;
     }
+
+    UPDATEPC(CURRENT_LATCHES.PC + 2);
+}
+
+void STW(int OP) {
+    int sr = DR(OP);
+    int baseR = BASER(OP);
+    int offset6 = (OP & 0x003F);
+    int address = baseR + OFFSET(offset6, 6);
+
+    MEMORY[address >> 1][1] = (CURRENT_LATCHES.REGS[sr] >> 8) & 0x00FF;
+    MEMORY[address >> 1][0] = CURRENT_LATCHES.REGS[sr] & 0x00FF;
 
     UPDATEPC(CURRENT_LATCHES.PC + 2);
 }
