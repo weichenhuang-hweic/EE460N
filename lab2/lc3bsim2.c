@@ -27,9 +27,6 @@
 /* These are the functions you'll have to write.               */
 /***************************************************************/
 
-// TODO: check left-shift, right-shift (C built-in) is logic or arithmetic
-// TODO: check ! could be replace or not
-
 void process_instruction();
 
 // Aid Functions
@@ -46,7 +43,6 @@ int TRAPVECT8(int trapvect8);
 void SETCC(int value);
 int GETCC();
 void UPDATEPC(int PCNext);
-void UPDATEREG();
 
 // Instruction Functions
 // NOTE: Skip RTI according to document
@@ -558,13 +554,6 @@ int GETCC() {
 
 void UPDATEPC(int PCNext) {
     NEXT_LATCHES.PC = PCNext;
-}
-
-// TODO: maybe change each func to next rather than here
-void UPDATEREG() {
-    for (int i = 0; i < LC_3b_REGS; i++) {
-        NEXT_LATCHES.REGS[i] = CURRENT_LATCHES.REGS[i];
-    }
 }
 
 void ADD(int OP) {
