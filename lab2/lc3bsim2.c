@@ -621,7 +621,6 @@ void JSRJSRR(int OP) {
 }
 
 void LDB(int OP) {
-    // TODO: check address is positive or in the PC limit?
     int dr = DR(OP);
     int baseR = BASER(OP);
     int bOffset6 = (OP & 0x003F);
@@ -640,7 +639,6 @@ void LDB(int OP) {
 }
 
 void LDW(int OP) {
-    // TODO: check address is positive or in the PC limit?
     int dr = DR(OP);
     int baseR = BASER(OP);
     int offset6 = (OP & 0x003F);
@@ -692,7 +690,6 @@ void SHF(int OP) {
 }
 
 void STB(int OP) {
-    // TODO: check address is positive or in the PC limit?
     int sr = DR(OP);
     int baseR = BASER(OP);
     int bOffset6 = (OP & 0x003F);
@@ -710,7 +707,6 @@ void STB(int OP) {
 }
 
 void STW(int OP) {
-    // TODO: check address is positive or in the PC limit?
     int sr = DR(OP);
     int baseR = BASER(OP);
     int offset6 = (OP & 0x003F);
