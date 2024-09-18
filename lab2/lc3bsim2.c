@@ -449,36 +449,35 @@ void process_instruction() {
     int lowerByte = MEMORY[PC >> 1][0];
     int upperByte = MEMORY[PC >> 1][1];
     int OP = upperByte << 8 | lowerByte;
+    int OPCODE = OP >> 12;
 
-    if (!((OP >> 12) ^ (0b0001))) {
+    if (!(OPCODE ^ (0b0001))) {
         ADD(OP);
-    } else if (!((OP >> 12) ^ (0b0101))) {
+    } else if (!(OPCODE ^ (0b0101))) {
         AND(OP);
-    } else if (!((OP >> 12) ^ (0b0000))) {
+    } else if (!(OPCODE ^ (0b0000))) {
         BR(OP);
-    } else if (!((OP >> 12) ^ (0b1100))) {
+    } else if (!(OPCODE ^ (0b1100))) {
         JMPRET(OP);
-    } else if (!((OP >> 12) ^ (0b0100))) {
+    } else if (!(OPCODE ^ (0b0100))) {
         JSRJSRR(OP);
-    } else if (!((OP >> 12) ^ (0b0010))) {
+    } else if (!(OPCODE ^ (0b0010))) {
         LDB(OP);
-    } else if (!((OP >> 12) ^ (0b0110))) {
+    } else if (!(OPCODE ^ (0b0110))) {
         LDW(OP);
-    } else if (!((OP >> 12) ^ (0b1110))) {
+    } else if (!(OPCODE ^ (0b1110))) {
         LEA(OP);
-    } else if (!((OP >> 12) ^ (0b1101))) {
+    } else if (!(OPCODE ^ (0b1101))) {
         SHF(OP);
-    } else if (!((OP >> 12) ^ (0b0011))) {
+    } else if (!(OPCODE ^ (0b0011))) {
         STB(OP);
-    } else if (!((OP >> 12) ^ (0b0111))) {
+    } else if (!(OPCODE ^ (0b0111))) {
         STW(OP);
-    } else if (!((OP >> 12) ^ (0b1111))) {
+    } else if (!(OPCODE ^ (0b1111))) {
         TRAP(OP);
-    } else if (!((OP >> 12) ^ (0b1001))) {
+    } else if (!(OPCODE ^ (0b1001))) {
         XORNOT(OP);
     }
-
-    UPDATEREG();
 }
 
 int DR(int OP) {
@@ -502,7 +501,7 @@ int IMME5(int OP) {
 }
 
 int SEXT(int imme, int digit) {
-    if (imme >> (digit - 1)) {
+    if ((imme >> (digit - 1)) & 0b1) {
         return Low16bits(imme | (0xFFFF << digit));
     }
     return Low16bits(imme);
@@ -561,6 +560,7 @@ void UPDATEPC(int PCNext) {
     NEXT_LATCHES.PC = PCNext;
 }
 
+// TODO: maybe change each func to next rather than here
 void UPDATEREG() {
     for (int i = 0; i < LC_3b_REGS; i++) {
         NEXT_LATCHES.REGS[i] = CURRENT_LATCHES.REGS[i];
@@ -573,13 +573,13 @@ void ADD(int OP) {
 
     if (OP & 0x0020) {
         int imme5 = SEXT(IMME5(OP), 5);
-        CURRENT_LATCHES.REGS[dr] = Low16bits(CURRENT_LATCHES.REGS[sr1] + imme5);
+        NEXT_LATCHES.REGS[dr] = Low16bits(CURRENT_LATCHES.REGS[sr1] + imme5);
     } else {
         int sr2 = SR2(OP);
-        CURRENT_LATCHES.REGS[dr] = Low16bits(CURRENT_LATCHES.REGS[sr1] + CURRENT_LATCHES.REGS[sr2]);
+        NEXT_LATCHES.REGS[dr] = Low16bits(CURRENT_LATCHES.REGS[sr1] + CURRENT_LATCHES.REGS[sr2]);
     }
 
-    SETCC(CURRENT_LATCHES.REGS[dr]);
+    SETCC(NEXT_LATCHES.REGS[dr]);
     UPDATEPC(CURRENT_LATCHES.PC + 2);
 }
 
@@ -589,13 +589,13 @@ void AND(int OP) {
 
     if (OP & 0x0020) {
         int imme5 = SEXT(IMME5(OP), 5);
-        CURRENT_LATCHES.REGS[dr] = Low16bits(CURRENT_LATCHES.REGS[sr1] & imme5);
+        NEXT_LATCHES.REGS[dr] = Low16bits(CURRENT_LATCHES.REGS[sr1] & imme5);
     } else {
         int sr2 = SR2(OP);
-        CURRENT_LATCHES.REGS[dr] = Low16bits(CURRENT_LATCHES.REGS[sr1] & CURRENT_LATCHES.REGS[sr2]);
+        NEXT_LATCHES.REGS[dr] = Low16bits(CURRENT_LATCHES.REGS[sr1] & CURRENT_LATCHES.REGS[sr2]);
     }
 
-    SETCC(CURRENT_LATCHES.REGS[dr]);
+    SETCC(NEXT_LATCHES.REGS[dr]);
     UPDATEPC(CURRENT_LATCHES.PC + 2);
 }
 
@@ -628,10 +628,11 @@ void JSRJSRR(int OP) {
         UPDATEPC(CURRENT_LATCHES.REGS[baseR]);
     }
 
-    CURRENT_LATCHES.REGS[7] = tempPCNext;
+    NEXT_LATCHES.REGS[7] = tempPCNext;
 }
 
 void LDB(int OP) {
+    // TODO: check address is positive or in the PC limit?
     int dr = DR(OP);
     int baseR = BASER(OP);
     int bOffset6 = (OP & 0x003F);
@@ -640,16 +641,17 @@ void LDB(int OP) {
     int upperByte = MEMORY[address >> 1][1];
 
     if (address & 0x0001) {
-        CURRENT_LATCHES.REGS[dr] = SEXT(upperByte, 8);
+        NEXT_LATCHES.REGS[dr] = SEXT(upperByte, 8);
     } else {
-        CURRENT_LATCHES.REGS[dr] = SEXT(lowerByte, 8);
+        NEXT_LATCHES.REGS[dr] = SEXT(lowerByte, 8);
     }
 
-    SETCC(CURRENT_LATCHES.REGS[dr]);
+    SETCC(NEXT_LATCHES.REGS[dr]);
     UPDATEPC(CURRENT_LATCHES.PC + 2);
 }
 
 void LDW(int OP) {
+    // TODO: check address is positive or in the PC limit?
     int dr = DR(OP);
     int baseR = BASER(OP);
     int offset6 = (OP & 0x003F);
@@ -658,9 +660,9 @@ void LDW(int OP) {
     int upperByte = MEMORY[address >> 1][1];
     int value = Low16bits((upperByte << 8) | lowerByte);
 
-    CURRENT_LATCHES.REGS[dr] = value;
+    NEXT_LATCHES.REGS[dr] = value;
 
-    SETCC(CURRENT_LATCHES.REGS[dr]);
+    SETCC(NEXT_LATCHES.REGS[dr]);
     UPDATEPC(CURRENT_LATCHES.PC + 2);
 }
 
@@ -668,7 +670,7 @@ void LEA(int OP) {
     int dr = DR(OP);
     int pcOffset9 = (OP & 0x01FF);
 
-    CURRENT_LATCHES.REGS[dr] = PCOFFSET(pcOffset9, 9);
+    NEXT_LATCHES.REGS[dr] = PCOFFSET(pcOffset9, 9);
 
     // NOTE: LEA does not SETCC according to document
     UPDATEPC(CURRENT_LATCHES.PC + 2);
@@ -680,27 +682,28 @@ void SHF(int OP) {
     int amount4 = (OP & 0x000F);
 
     if (!(OP & 0x0010)) {
-        CURRENT_LATCHES.REGS[dr] = Low16bits(CURRENT_LATCHES.REGS[sr] << amount4);
+        NEXT_LATCHES.REGS[dr] = Low16bits(CURRENT_LATCHES.REGS[sr] << amount4);
     } else {
         if (!(OP & 0x0020)) {
             // Logic Right Shift
-            CURRENT_LATCHES.REGS[dr] = Low16bits(CURRENT_LATCHES.REGS[sr] >> amount4);
+            NEXT_LATCHES.REGS[dr] = Low16bits(CURRENT_LATCHES.REGS[sr] >> amount4);
         } else {
             // Arithmetic Right Shift
             int RSHF = Low16bits(CURRENT_LATCHES.REGS[sr] >> amount4);
             if (CURRENT_LATCHES.REGS[sr] & 0x8000) {
-                CURRENT_LATCHES.REGS[dr] = Low16bits(RSHF | (0xFFFF << (16 - amount4)));
+                NEXT_LATCHES.REGS[dr] = Low16bits(RSHF | (0xFFFF << (16 - amount4)));
             } else {
-                CURRENT_LATCHES.REGS[dr] = Low16bits(RSHF);
+                NEXT_LATCHES.REGS[dr] = Low16bits(RSHF);
             }
         }
     }
 
-    SETCC(CURRENT_LATCHES.REGS[dr]);
+    SETCC(NEXT_LATCHES.REGS[dr]);
     UPDATEPC(CURRENT_LATCHES.PC + 2);
 }
 
 void STB(int OP) {
+    // TODO: check address is positive or in the PC limit?
     int sr = DR(OP);
     int baseR = BASER(OP);
     int bOffset6 = (OP & 0x003F);
@@ -718,6 +721,7 @@ void STB(int OP) {
 }
 
 void STW(int OP) {
+    // TODO: check address is positive or in the PC limit?
     int sr = DR(OP);
     int baseR = BASER(OP);
     int offset6 = (OP & 0x003F);
@@ -730,7 +734,7 @@ void STW(int OP) {
 }
 
 void TRAP(int OP) {
-    CURRENT_LATCHES.REGS[7] = CURRENT_LATCHES.PC + 2;
+    NEXT_LATCHES.REGS[7] = CURRENT_LATCHES.PC + 2;
 
     int address = TRAPVECT8((OP & 0x00FF));
     int lowerByte = MEMORY[address >> 1][0];
@@ -746,12 +750,12 @@ void XORNOT(int OP) {
 
     if (OP & 0x0020) {
         int imme5 = SEXT(IMME5(OP), 5);
-        CURRENT_LATCHES.REGS[dr] = Low16bits(CURRENT_LATCHES.REGS[sr1] ^ imme5);
+        NEXT_LATCHES.REGS[dr] = Low16bits(CURRENT_LATCHES.REGS[sr1] ^ imme5);
     } else {
         int sr2 = SR2(OP);
-        CURRENT_LATCHES.REGS[dr] = Low16bits(CURRENT_LATCHES.REGS[sr1] ^ CURRENT_LATCHES.REGS[sr2]);
+        NEXT_LATCHES.REGS[dr] = Low16bits(CURRENT_LATCHES.REGS[sr1] ^ CURRENT_LATCHES.REGS[sr2]);
     }
 
-    SETCC(CURRENT_LATCHES.REGS[dr]);
+    SETCC(NEXT_LATCHES.REGS[dr]);
     UPDATEPC(CURRENT_LATCHES.PC + 2);
 }
