@@ -619,13 +619,13 @@ void eval_micro_sequencer() {
 
     if (IRD_BIT) {
         int IR = CURRENT_LATCHES.IR;
-        NEXT_LATCHES.STATE_NUMBER = 0b000000 + IR & 0xF000 >> 12; // 0,0,IR[15:12]
+        NEXT_LATCHES.STATE_NUMBER = 0b000000 + ((IR & 0xF000) >> 12); // 0,0,IR[15:12]
     } else {
         NEXT_LATCHES.STATE_NUMBER =
             (J_BIT & 0b111000) +
-            ((J_BIT & 0b000100) | ((COND_BIT & 0b10) & ~(COND_BIT & 0b01) & CURRENT_LATCHES.BEN)) +
-            ((J_BIT & 0b000010) | (~(COND_BIT & 0b10) & (COND_BIT & 0b01) & CURRENT_LATCHES.READY)) +
-            ((J_BIT & 0b000001) | ((COND_BIT & 0b10) & (COND_BIT & 0b01) & (CURRENT_LATCHES.IR & 0x0800)));
+            ((J_BIT & 0b000100) | (((COND_BIT & 0b10) >> 1) & ~(COND_BIT & 0b01) & CURRENT_LATCHES.BEN) << 2) +
+            ((J_BIT & 0b000010) | ((~(COND_BIT & 0b10) >> 1) & (COND_BIT & 0b01) & CURRENT_LATCHES.READY) << 1) +
+            ((J_BIT & 0b000001) | (((COND_BIT & 0b10) >> 1) & (COND_BIT & 0b01) & ((CURRENT_LATCHES.IR & 0x0800) >> 11)));
     }
 }
 
@@ -650,6 +650,7 @@ void cycle_memory() {
                 MEMORY_COUNT = 0;
             }
         } else {
+            NEXT_LATCHES.READY = 0;
             int R_W = GetR_W(micro_instruction);
             int DATA_SIZE = GetDATA_SIZE(micro_instruction);
             int LD_MDR = GetLD_MDR(micro_instruction);
@@ -661,28 +662,25 @@ void cycle_memory() {
                     MEMORY[CURRENT_LATCHES.MAR >> 1][0] = Low16bits(CURRENT_LATCHES.MDR & 0x00ff);
                 } else {
                     if (CURRENT_LATCHES.MAR & 0x0001) {
-                        MEMORY[CURRENT_LATCHES.MAR >> 1][1] = NEXT_LATCHES.MDR & 0x00ff;
+                        MEMORY[CURRENT_LATCHES.MAR >> 1][1] = CURRENT_LATCHES.MDR & 0x00ff;
                     } else {
-                        MEMORY[CURRENT_LATCHES.MAR >> 1][0] = NEXT_LATCHES.MDR & 0x00ff;
+                        MEMORY[CURRENT_LATCHES.MAR >> 1][0] = CURRENT_LATCHES.MDR & 0x00ff;
                     }
                 }
             } else {
                 // read
                 if (LD_MDR) {
-                    // should we consider KBDR, KBSR, DSDR, DSR?
                     if (DATA_SIZE) {
-                        NEXT_LATCHES.MDR = Low16bits((MEMORY[CURRENT_LATCHES.MAR >> 1][1] << 8) + MEMORY[CURRENT_LATCHES.MAR][0]);
+                        LATCH_MDR = Low16bits((MEMORY[CURRENT_LATCHES.MAR >> 1][1] << 8) + MEMORY[CURRENT_LATCHES.MAR >> 1][0]);
                     } else {
                         if (CURRENT_LATCHES.MAR & 0x0001) {
-                            NEXT_LATCHES.MDR = Low16bits(MEMORY[CURRENT_LATCHES.MAR >> 1][1]);
+                            LATCH_MDR = Low16bits(MEMORY[CURRENT_LATCHES.MAR >> 1][1]);
                         } else {
-                            NEXT_LATCHES.MDR = Low16bits(MEMORY[CURRENT_LATCHES.MAR >> 1][0]);
+                            LATCH_MDR = Low16bits(MEMORY[CURRENT_LATCHES.MAR >> 1][0]);
                         }
                     }
                 }
             }
-
-            LATCH_MDR = NEXT_LATCHES.MDR;
         }
     }
 }
@@ -703,7 +701,6 @@ void eval_bus_drivers() {
 
     // CONTROL
     int STEEERBIT = (IR & 0x0020) >> 5;
-    int ALUK = (IR & 0xC000) >> 14;
 
     // SR1MUX
     int SR1MUX = GetSR1MUX(micro_instruction);
@@ -721,6 +718,7 @@ void eval_bus_drivers() {
     }
 
     // ALUMUX
+    int ALUK = GetALUK(micro_instruction);
     if (ALUK == 0) {
         // ADD
         LATCH_ALUMUX = Low16bits(LATCH_SR1MUX + LATCH_SR2MUX);
@@ -738,8 +736,8 @@ void eval_bus_drivers() {
     }
 
     // SHFMUX
-    int L_R_SHF = IR & 0x0010;
-    int R_A_L_SHF = IR & 0x0020;
+    int L_R_SHF = (IR & 0x0010) >> 4;
+    int R_A_L_SHF = (IR & 0x0020) >> 5;
     int amount4 = IR & 0x000f;
     if (L_R_SHF) {
         if (R_A_L_SHF) {
@@ -762,9 +760,9 @@ void eval_bus_drivers() {
     // ADDR1MUX
     int ADDR1MUX = GetADDR1MUX(micro_instruction);
     if (ADDR1MUX) {
-        LATCH_ADDR1MUX = CURRENT_LATCHES.PC;
-    } else {
         LATCH_ADDR1MUX = LATCH_SR1MUX;
+    } else {
+        LATCH_ADDR1MUX = CURRENT_LATCHES.PC;
     }
 
     // ADDR2MUX
@@ -792,17 +790,7 @@ void eval_bus_drivers() {
     // ADDER
     LATCH_ADDER = Low16bits(LATCH_LSHF + LATCH_ADDR1MUX);
 
-    // PCMUX
-    int PCMUX = GetPCMUX(micro_instruction);
-    if (PCMUX == 0) {
-        LATCH_PCMUX = CURRENT_LATCHES.PC + 2;
-    } else if (PCMUX == 1) {
-        LATCH_PCMUX = BUS;
-    } else if (PCMUX == 2) {
-        LATCH_PCMUX = LATCH_ADDER;
-    } else {
-        exit(1);
-    }
+    // Omit PCMUX Here, put in latch_datapath_values()
 
     // MARMUX
     int MARMUX = GetMARMUX(micro_instruction);
@@ -830,9 +818,19 @@ void drive_bus() {
         exit(1);
     } else {
         if (Gate_PC) {
-            BUS = LATCH_PCMUX;
+            BUS = CURRENT_LATCHES.PC;
         } else if (Gate_MDR) {
-            BUS = LATCH_MDR;
+            int *micro_instruction = CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER];
+            int DATA_SIZE = GetDATA_SIZE(micro_instruction);
+            if (DATA_SIZE) {
+                BUS = CURRENT_LATCHES.MDR;
+            } else {
+                if (CURRENT_LATCHES.MAR & 0x0001) {
+                    BUS = Low16bits(SEXT((CURRENT_LATCHES.MDR & 0xff00) >> 8, 8));
+                } else {
+                    BUS = Low16bits(SEXT(CURRENT_LATCHES.MDR & 0x00ff, 8));
+                }
+            }
         } else if (Gate_ALU) {
             BUS = LATCH_ALUMUX;
         } else if (Gate_SHF) {
@@ -840,7 +838,7 @@ void drive_bus() {
         } else if (Gate_MARMUX) {
             BUS = LATCH_MARMUX;
         } else {
-            exit(1);
+            BUS = 0;
         }
     }
 }
@@ -854,15 +852,24 @@ void latch_datapath_values() {
      * after drive_bus.
      */
 
-    // omit LD_MDR, we finished this in cycle_memory()
     int *micro_instruction = CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER];
     int IR = CURRENT_LATCHES.IR;
+    int LD_MDR = GetLD_MDR(micro_instruction);
     int LD_MAR = GetLD_MAR(micro_instruction);
     int LD_IR = GetLD_IR(micro_instruction);
     int LD_BEN = GetLD_BEN(micro_instruction);
     int LD_REG = GetLD_REG(micro_instruction);
     int LD_CC = GetLD_CC(micro_instruction);
     int LD_PC = GetLD_PC(micro_instruction);
+
+    if (LD_MDR) {
+        int MIO_EN = GetMIO_EN(micro_instruction);
+        if (MIO_EN) {
+            NEXT_LATCHES.MDR = LATCH_MDR;
+        } else {
+            NEXT_LATCHES.MDR = BUS;
+        }
+    }
 
     if (LD_MAR) {
         NEXT_LATCHES.MAR = BUS;
@@ -873,7 +880,7 @@ void latch_datapath_values() {
     }
 
     if (LD_BEN) {
-        NEXT_LATCHES.BEN = (IR & 0x0800 & CURRENT_LATCHES.N) | (IR & 0x0400 & CURRENT_LATCHES.Z) | (IR & 0x0200 & CURRENT_LATCHES.P);
+        NEXT_LATCHES.BEN = (((IR & 0x0800) >> 11) & CURRENT_LATCHES.N) | (((IR & 0x0400) >> 10) & CURRENT_LATCHES.Z) | (((IR & 0x0200) >> 9) & CURRENT_LATCHES.P);
     }
 
     if (LD_REG) {
@@ -899,6 +906,15 @@ void latch_datapath_values() {
     }
 
     if (LD_PC) {
-        NEXT_LATCHES.PC = LATCH_PCMUX;
+        int PCMUX = GetPCMUX(micro_instruction);
+        if (PCMUX == 0) {
+            NEXT_LATCHES.PC = CURRENT_LATCHES.PC + 2;
+        } else if (PCMUX == 1) {
+            NEXT_LATCHES.PC = BUS;
+        } else if (PCMUX == 2) {
+            NEXT_LATCHES.PC = LATCH_ADDER;
+        } else {
+            exit(1);
+        }
     }
 }
