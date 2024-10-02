@@ -662,9 +662,9 @@ void cycle_memory() {
                     MEMORY[CURRENT_LATCHES.MAR >> 1][0] = Low16bits(CURRENT_LATCHES.MDR & 0x00ff);
                 } else {
                     if (CURRENT_LATCHES.MAR & 0x0001) {
-                        MEMORY[CURRENT_LATCHES.MAR >> 1][1] = CURRENT_LATCHES.MDR & 0x00ff;
+                        MEMORY[CURRENT_LATCHES.MAR >> 1][1] = Low16bits((CURRENT_LATCHES.MDR & 0xff00) >> 8);
                     } else {
-                        MEMORY[CURRENT_LATCHES.MAR >> 1][0] = CURRENT_LATCHES.MDR & 0x00ff;
+                        MEMORY[CURRENT_LATCHES.MAR >> 1][0] = Low16bits(CURRENT_LATCHES.MDR & 0x00ff);
                     }
                 }
             } else {
@@ -867,7 +867,16 @@ void latch_datapath_values() {
         if (MIO_EN) {
             NEXT_LATCHES.MDR = LATCH_MDR;
         } else {
-            NEXT_LATCHES.MDR = BUS;
+            int DATA_SIZE = GetDATA_SIZE(micro_instruction);
+            if (DATA_SIZE) {
+                NEXT_LATCHES.MDR = BUS;
+            } else {
+                if (CURRENT_LATCHES.MAR & 0x0001) {
+                    NEXT_LATCHES.MDR = ((BUS & 0x00ff) << 8) | (BUS & 0x00ff);
+                } else {
+                    NEXT_LATCHES.MDR = BUS;
+                }
+            }
         }
     }
 
