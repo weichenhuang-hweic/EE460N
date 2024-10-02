@@ -7,3 +7,4 @@ This repository contains all the lab assignments for the course. Each lab is des
 - [Lab 0](lab0/)
 - [Lab 1](lab1/)
 - [Lab 2](lab2/)
+- [Lab 3](lab3/)

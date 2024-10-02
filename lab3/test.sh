@@ -1,2 +1,2 @@
-./assembler.linux test.asm isaprogram
+./assembler.linux test/test.asm isaprogram
 ./simulate ucode3 isaprogram
