@@ -40,3 +40,4 @@
 # Other
 *.swp
 *~
+.DS_STORE
