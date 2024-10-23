@@ -47,6 +47,10 @@ int LATCH_PCMUX;
 int LATCH_MARMUX;
 int LATCH_MDR;
 
+// lab4
+int LATCH_SP;
+int LATCH_SPMUX;
+
 /***************************************************************/
 /* A couple of useful definitions.                             */
 /***************************************************************/
@@ -223,7 +227,8 @@ typedef struct System_Latches_Struct {
     /* For lab 4 */
     int INTV; /* Interrupt vector register */
     int EXCV; /* Exception vector register */
-    int SSP;  /* Initial value of system stack pointer */
+    int SSP;  /* TODO: Initial value of system stack pointer */
+    int USP;  /* User stack pointer */
     /* MODIFY: You may add system latches that are required by your implementation */
 
 } System_Latches;
@@ -838,6 +843,17 @@ void eval_bus_drivers() {
     } else {
         LATCH_MARMUX = (0x0000 | (IR & 0x00ff)) << 1;
     }
+
+    // SP
+    LATCH_SP = Low16bits(LATCH_SR1MUX);
+
+    // SP_MUX
+    int SP_MUX = GetSP_MUX(micro_instruction);
+    if (SP_MUX) {
+        LATCH_SPMUX = LATCH_SP + 2;
+    } else {
+        LATCH_SPMUX = LATCH_SP - 2;
+    }
 }
 
 void drive_bus() {
@@ -852,9 +868,12 @@ void drive_bus() {
     int Gate_ALU = GetGATE_ALU(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
     int Gate_MARMUX = GetGATE_MARMUX(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
     int Gate_SHF = GetGATE_SHF(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
+    int Gate_USP = GetGate_USP(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
+    int Gate_SSP = GetGate_SSP(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
+    int Gate_SP = GetGate_SP(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
     int Gate_Old_PC = GetGate_OldPc(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
 
-    if (Gate_PC + Gate_MDR + Gate_ALU + Gate_MARMUX + Gate_SHF + Gate_Old_PC > 1) {
+    if (Gate_PC + Gate_MDR + Gate_ALU + Gate_MARMUX + Gate_SHF + Gate_USP + Gate_SSP + Gate_SP + Gate_Old_PC > 1) {
         exit(1);
     } else {
         if (Gate_PC) {
@@ -877,6 +896,12 @@ void drive_bus() {
             BUS = LATCH_SHFMUX;
         } else if (Gate_MARMUX) {
             BUS = LATCH_MARMUX;
+        } else if (Gate_USP) {
+            BUS = CURRENT_LATCHES.USP;
+        } else if (Gate_SSP) {
+            BUS = CURRENT_LATCHES.SSP;
+        } else if (Gate_SP) {
+            BUS = LATCH_SPMUX;
         } else if (Gate_Old_PC) {
             BUS = CURRENT_LATCHES.PC - 2;
         } else {
@@ -967,5 +992,13 @@ void latch_datapath_values() {
         } else {
             exit(1);
         }
+    }
+
+    if (LD_USP) {
+        NEXT_LATCHES.USP = LATCH_SP;
+    }
+
+    if (LD_SSP) {
+        NEXT_LATCHES.SSP = LATCH_SP;
     }
 }
