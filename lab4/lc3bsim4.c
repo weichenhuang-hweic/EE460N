@@ -594,9 +594,9 @@ void initialize(char *argv[], int num_prog_files) {
     CURRENT_LATCHES.Z = 1;
     CURRENT_LATCHES.STATE_NUMBER = INITIAL_STATE_NUMBER;
     memcpy(CURRENT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[INITIAL_STATE_NUMBER], sizeof(int) * CONTROL_STORE_BITS);
-    CURRENT_LATCHES.SSP = 0x3000;                                               /* Initial value of system stack pointer */
-    CURRENT_LATCHES.REGS[6] = 0xFE00; /* Initial value of user stack pointer */ // FIXME: USP?
-    CURRENT_LATCHES.PSR_XV = 1;                                                 /* Initial value of PSR[15] */
+    CURRENT_LATCHES.SSP = 0x3000; /* Initial value of system stack pointer */
+    CURRENT_LATCHES.USP = 0xFE00; /* Initial value of user stack pointer */
+    CURRENT_LATCHES.PSR_XV = 1;   /* Initial value of PSR[15] */
 
     NEXT_LATCHES = CURRENT_LATCHES;
 
@@ -990,7 +990,7 @@ void latch_datapath_values() {
             NEXT_LATCHES.STATE_NUMBER = 0b001010;
         }
         // unaligned memory access exception
-        else if ((BUS & 0x0001) && DATA_SIZE) {
+        else if (((BUS & 0x0001) && (DATA_SIZE)) {
             NEXT_LATCHES.EXC = 1;
             NEXT_LATCHES.EXCV = 0x03;
             NEXT_LATCHES.STATE_NUMBER = 0b001010;
