@@ -741,7 +741,9 @@ void eval_bus_drivers() {
 
     // SR1MUX
     int SR1MUX = GetSR1MUX(micro_instruction);
-    if (SR1MUX) {
+    if (SR1MUX >= 2) {
+        LATCH_SR1MUX = CURRENT_LATCHES.REGS[6];
+    } else if (SR1MUX == 1) {
         LATCH_SR1MUX = CURRENT_LATCHES.REGS[(IR & 0x01C0) >> 6];
     } else {
         LATCH_SR1MUX = CURRENT_LATCHES.REGS[(IR & 0x0E00) >> 9];
@@ -931,7 +933,7 @@ void latch_datapath_values() {
 
     if (LD_REG) {
         int DRMUX = GetDRMUX(micro_instruction);
-        int DR = DRMUX ? 7 : ((IR & 0x0E00) >> 9);
+        int DR = DRMUX >= 2 ? 6 : (DRMUX == 1 ? 7 : ((IR & 0x0E00) >> 9));
         NEXT_LATCHES.REGS[DR] = BUS;
     }
 
