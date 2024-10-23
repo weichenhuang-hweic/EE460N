@@ -27,6 +27,7 @@
 /* These are the functions you'll have to write.               */
 /***************************************************************/
 
+void set_interrupts();
 void eval_micro_sequencer();
 void cycle_memory();
 void eval_bus_drivers();
@@ -50,8 +51,6 @@ int LATCH_MDR;
 // lab4
 int LATCH_SP;
 int LATCH_SPMUX;
-int LATCH_EXCOND; // FIXME: check if this is correct
-int LATCH_INT;    // FIXME: check if this is correct
 
 /***************************************************************/
 /* A couple of useful definitions.                             */
@@ -125,7 +124,7 @@ enum CS_BITS {
     GateOldPc,
     SPMUX,
     ResetInt,
-    ResetEXCond,
+    ResetEXC,
     CONTROL_STORE_BITS
 } CS_BITS;
 
@@ -169,11 +168,11 @@ int GetGate_PSR(int *x) { return (x[GatePSR]); }
 int GetGate_USP(int *x) { return (x[GateUSP]); }
 int GetGate_SSP(int *x) { return (x[GateSSP]); }
 int GetGate_SP(int *x) { return (x[GateSP]); }
-int GetGate_Vector(int *x) { return (x[GateVector]); }
+int GetGate_VECTOR(int *x) { return (x[GateVector]); }
 int GetGate_OldPc(int *x) { return (x[GateOldPc]); }
 int GetSPMUX(int *x) { return (x[SPMUX]); }
 int GetResetInt(int *x) { return (x[ResetInt]); }
-int GetResetEXCond(int *x) { return (x[ResetEXCond]); }
+int GetResetEXC(int *x) { return (x[ResetEXC]); }
 
 /***************************************************************/
 /* The control store rom.                                      */
@@ -227,13 +226,15 @@ typedef struct System_Latches_Struct {
     int STATE_NUMBER; /* Current State Number - Provided for debugging */
 
     /* For lab 4 */
-    int INTV;   /* Interrupt vector register */
-    int EXCV;   /* Exception vector register */
-    int SSP;    /* TODO: Initial value of system stack pointer */
+    int INT;
+    int INTV; /* Interrupt vector register */
+    int EXC;
+    int EXCV; /* Exception vector register */
+    int EXCOND;
+    int SSP;    /* System stack pointer */
     int USP;    /* User stack pointer */
     int PSR_XV; /* We omit PSD[14:3]*/
-    /* MODIFY: You may add system latches that are required by your implementation */
-
+    int VECTOR;
 } System_Latches;
 
 /* Data Structure for Latch */
@@ -270,6 +271,10 @@ void help() {
 /*                                                             */
 /***************************************************************/
 void cycle() {
+    // Lab 4: Manually Set Interrupt
+    if (CYCLE_COUNT == 300) {
+        set_interrupts();
+    }
 
     eval_micro_sequencer();
     cycle_memory();
@@ -651,8 +656,11 @@ int SEXT(int imme, int digit) {
     return Low16bits(imme);
 }
 
-void eval_micro_sequencer() {
+void set_interrupts() {
+    CURRENT_LATCHES.INT = 1;
+}
 
+void eval_micro_sequencer() {
     /*
      * Evaluate the address of the next state according to the
      * micro sequencer logic. Latch the next microinstruction.
@@ -669,9 +677,16 @@ void eval_micro_sequencer() {
     } else {
         NEXT_LATCHES.STATE_NUMBER =
             (J_BIT & 0b111000) +
-            ((J_BIT & 0b000100) | (((COND_BIT & 0b10) >> 1) & ~(COND_BIT & 0b01) & CURRENT_LATCHES.BEN) << 2) +
-            ((J_BIT & 0b000010) | ((~(COND_BIT & 0b10) >> 1) & (COND_BIT & 0b01) & CURRENT_LATCHES.READY) << 1) +
-            ((J_BIT & 0b000001) | (((COND_BIT & 0b10) >> 1) & (COND_BIT & 0b01) & ((CURRENT_LATCHES.IR & 0x0800) >> 11)));
+            ((J_BIT & 0b001000) | (((COND_BIT & 0b100) >> 2) & (~(COND_BIT & 0b010) >> 1) & (COND_BIT & 0b001) & (CURRENT_LATCHES.INT | CURRENT_LATCHES.PSR_XV)) << 3) +
+            ((J_BIT & 0b000100) | ((~(COND_BIT & 0b100) >> 2) & ((COND_BIT & 0b010) >> 1) & ~(COND_BIT & 0b001) & CURRENT_LATCHES.BEN) << 2) +
+            ((J_BIT & 0b000010) | ((~(COND_BIT & 0b100) >> 2) & (~(COND_BIT & 0b010) >> 1) & (COND_BIT & 0b001) & CURRENT_LATCHES.READY) << 1) +
+            ((J_BIT & 0b000001) | ((~(COND_BIT & 0b100) >> 2) & ((COND_BIT & 0b010) >> 1) & (COND_BIT & 0b001) & ((CURRENT_LATCHES.IR & 0x0800) >> 11)));
+    }
+
+    // Unknown State Exception
+    if (NEXT_LATCHES.STATE_NUMBER == 0b001010 || NEXT_LATCHES.STATE_NUMBER == 0b001011) {
+        NEXT_LATCHES.EXC = 1;
+        NEXT_LATCHES.EXCV = 0x04;
     }
 }
 
@@ -876,9 +891,10 @@ void drive_bus() {
     int Gate_USP = GetGate_USP(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
     int Gate_SSP = GetGate_SSP(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
     int Gate_SP = GetGate_SP(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
+    int Gate_VECTOR = GetGate_VECTOR(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
     int Gate_Old_PC = GetGate_OldPc(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
 
-    if (Gate_PC + Gate_MDR + Gate_ALU + Gate_MARMUX + Gate_SHF + Gate_PSR + Gate_USP + Gate_SSP + Gate_SP + Gate_Old_PC > 1) {
+    if (Gate_PC + Gate_MDR + Gate_ALU + Gate_MARMUX + Gate_SHF + Gate_PSR + Gate_USP + Gate_SSP + Gate_SP + Gate_VECTOR + Gate_Old_PC > 1) {
         exit(1);
     } else {
         if (Gate_PC) {
@@ -909,6 +925,8 @@ void drive_bus() {
             BUS = CURRENT_LATCHES.SSP;
         } else if (Gate_SP) {
             BUS = LATCH_SPMUX;
+        } else if (Gate_VECTOR) {
+            BUS = Low16bits(Low16bits(CURRENT_LATCHES.VECTOR << 1) + 0x2000);
         } else if (Gate_Old_PC) {
             BUS = CURRENT_LATCHES.PC - 2;
         } else {
@@ -938,6 +956,9 @@ void latch_datapath_values() {
     int LD_PSR = GetLD_PSR(micro_instruction);
     int LD_USP = GetLD_USP(micro_instruction);
     int LD_SSP = GetLD_SSP(micro_instruction);
+    int LD_VECTOR = GetLD_VECTOR(micro_instruction);
+    int RESET_INT = GetResetInt(micro_instruction);
+    int RESET_EXC = GetResetEXC(micro_instruction);
 
     if (LD_MDR) {
         int MIO_EN = GetMIO_EN(micro_instruction);
@@ -958,7 +979,22 @@ void latch_datapath_values() {
     }
 
     if (LD_MAR) {
-        NEXT_LATCHES.MAR = BUS;
+        // Lab 4: check exceptions
+        int DATA_SIZE = GetDATA_SIZE(micro_instruction);
+        // protection exception
+        if ((BUS < 0x3000) && CURRENT_LATCHES.PSR_XV == 1 && ((CURRENT_LATCHES.IR & 0xF000) >> 12) != 0b001111) {
+            NEXT_LATCHES.EXC = 1;
+            NEXT_LATCHES.EXCV = 0x02;
+            NEXT_LATCHES.STATE_NUMBER = 0b001010;
+        }
+        // unaligned memory access exception
+        else if ((BUS & 0x0001) && DATA_SIZE) {
+            NEXT_LATCHES.EXC = 1;
+            NEXT_LATCHES.EXCV = 0x03;
+            NEXT_LATCHES.STATE_NUMBER = 0b001010;
+        } else {
+            NEXT_LATCHES.MAR = BUS;
+        }
     }
 
     if (LD_IR) {
@@ -1024,5 +1060,29 @@ void latch_datapath_values() {
 
     if (LD_SSP) {
         NEXT_LATCHES.SSP = LATCH_SP;
+    }
+
+    if (LD_VECTOR) {
+        if (CURRENT_LATCHES.EXC) {
+            NEXT_LATCHES.VECTOR = CURRENT_LATCHES.EXCV;
+        } else {
+            NEXT_LATCHES.VECTOR = CURRENT_LATCHES.INTV;
+        }
+    }
+
+    if (CURRENT_LATCHES.INT) {
+        NEXT_LATCHES.INTV = 0x01;
+    }
+
+    if (CURRENT_LATCHES.EXC) {
+        NEXT_LATCHES.EXCV = 0x01;
+    }
+
+    if (RESET_INT) {
+        NEXT_LATCHES.INT = 0;
+    }
+
+    if (RESET_EXC) {
+        NEXT_LATCHES.EXC = 0;
     }
 }
