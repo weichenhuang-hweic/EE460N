@@ -50,6 +50,8 @@ int LATCH_MDR;
 // lab4
 int LATCH_SP;
 int LATCH_SPMUX;
+int LATCH_EXCOND; // FIXME: check if this is correct
+int LATCH_INT;    // FIXME: check if this is correct
 
 /***************************************************************/
 /* A couple of useful definitions.                             */
@@ -225,10 +227,11 @@ typedef struct System_Latches_Struct {
     int STATE_NUMBER; /* Current State Number - Provided for debugging */
 
     /* For lab 4 */
-    int INTV; /* Interrupt vector register */
-    int EXCV; /* Exception vector register */
-    int SSP;  /* TODO: Initial value of system stack pointer */
-    int USP;  /* User stack pointer */
+    int INTV;   /* Interrupt vector register */
+    int EXCV;   /* Exception vector register */
+    int SSP;    /* TODO: Initial value of system stack pointer */
+    int USP;    /* User stack pointer */
+    int PSR_XV; /* We omit PSD[14:3]*/
     /* MODIFY: You may add system latches that are required by your implementation */
 
 } System_Latches;
@@ -587,6 +590,7 @@ void initialize(char *argv[], int num_prog_files) {
     CURRENT_LATCHES.STATE_NUMBER = INITIAL_STATE_NUMBER;
     memcpy(CURRENT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[INITIAL_STATE_NUMBER], sizeof(int) * CONTROL_STORE_BITS);
     CURRENT_LATCHES.SSP = 0x3000; /* Initial value of system stack pointer */
+    CURRENT_LATCHES.PSR_XV = 1;   /* Initial value of PSR[15] */
 
     NEXT_LATCHES = CURRENT_LATCHES;
 
@@ -848,7 +852,7 @@ void eval_bus_drivers() {
     LATCH_SP = Low16bits(LATCH_SR1MUX);
 
     // SP_MUX
-    int SP_MUX = GetSP_MUX(micro_instruction);
+    int SP_MUX = GetSPMUX(micro_instruction);
     if (SP_MUX) {
         LATCH_SPMUX = LATCH_SP + 2;
     } else {
@@ -868,12 +872,13 @@ void drive_bus() {
     int Gate_ALU = GetGATE_ALU(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
     int Gate_MARMUX = GetGATE_MARMUX(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
     int Gate_SHF = GetGATE_SHF(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
+    int Gate_PSR = GetGate_PSR(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
     int Gate_USP = GetGate_USP(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
     int Gate_SSP = GetGate_SSP(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
     int Gate_SP = GetGate_SP(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
     int Gate_Old_PC = GetGate_OldPc(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
 
-    if (Gate_PC + Gate_MDR + Gate_ALU + Gate_MARMUX + Gate_SHF + Gate_USP + Gate_SSP + Gate_SP + Gate_Old_PC > 1) {
+    if (Gate_PC + Gate_MDR + Gate_ALU + Gate_MARMUX + Gate_SHF + Gate_PSR + Gate_USP + Gate_SSP + Gate_SP + Gate_Old_PC > 1) {
         exit(1);
     } else {
         if (Gate_PC) {
@@ -896,6 +901,8 @@ void drive_bus() {
             BUS = LATCH_SHFMUX;
         } else if (Gate_MARMUX) {
             BUS = LATCH_MARMUX;
+        } else if (Gate_PSR) {
+            BUS = Low16bits((CURRENT_LATCHES.PSR_XV << 15) | (CURRENT_LATCHES.N << 2) | (CURRENT_LATCHES.Z << 1) | CURRENT_LATCHES.P);
         } else if (Gate_USP) {
             BUS = CURRENT_LATCHES.USP;
         } else if (Gate_SSP) {
@@ -928,6 +935,9 @@ void latch_datapath_values() {
     int LD_REG = GetLD_REG(micro_instruction);
     int LD_CC = GetLD_CC(micro_instruction);
     int LD_PC = GetLD_PC(micro_instruction);
+    int LD_PSR = GetLD_PSR(micro_instruction);
+    int LD_USP = GetLD_USP(micro_instruction);
+    int LD_SSP = GetLD_SSP(micro_instruction);
 
     if (LD_MDR) {
         int MIO_EN = GetMIO_EN(micro_instruction);
@@ -965,19 +975,25 @@ void latch_datapath_values() {
         NEXT_LATCHES.REGS[DR] = BUS;
     }
 
-    if (LD_CC) {
-        if (BUS == 0) {
-            NEXT_LATCHES.N = 0;
-            NEXT_LATCHES.Z = 1;
-            NEXT_LATCHES.P = 0;
-        } else if (BUS & 0x8000) {
-            NEXT_LATCHES.N = 1;
-            NEXT_LATCHES.Z = 0;
-            NEXT_LATCHES.P = 0;
+    if (LD_CC || LD_PSR) {
+        if (LD_PSR) {
+            NEXT_LATCHES.N = BUS & 0x0004;
+            NEXT_LATCHES.Z = BUS & 0x0002;
+            NEXT_LATCHES.P = BUS & 0x0001;
         } else {
-            NEXT_LATCHES.N = 0;
-            NEXT_LATCHES.Z = 0;
-            NEXT_LATCHES.P = 1;
+            if (BUS == 0) {
+                NEXT_LATCHES.N = 0;
+                NEXT_LATCHES.Z = 1;
+                NEXT_LATCHES.P = 0;
+            } else if (BUS & 0x8000) {
+                NEXT_LATCHES.N = 1;
+                NEXT_LATCHES.Z = 0;
+                NEXT_LATCHES.P = 0;
+            } else {
+                NEXT_LATCHES.N = 0;
+                NEXT_LATCHES.Z = 0;
+                NEXT_LATCHES.P = 1;
+            }
         }
     }
 
@@ -991,6 +1007,14 @@ void latch_datapath_values() {
             NEXT_LATCHES.PC = LATCH_ADDER;
         } else {
             exit(1);
+        }
+    }
+
+    if (LD_PSR) {
+        if (LD_USP) {
+            NEXT_LATCHES.PSR_XV = 0;
+        } else {
+            NEXT_LATCHES.PSR_XV = BUS & 0x8000;
         }
     }
 
