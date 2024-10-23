@@ -594,8 +594,9 @@ void initialize(char *argv[], int num_prog_files) {
     CURRENT_LATCHES.Z = 1;
     CURRENT_LATCHES.STATE_NUMBER = INITIAL_STATE_NUMBER;
     memcpy(CURRENT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[INITIAL_STATE_NUMBER], sizeof(int) * CONTROL_STORE_BITS);
-    CURRENT_LATCHES.SSP = 0x3000; /* Initial value of system stack pointer */
-    CURRENT_LATCHES.PSR_XV = 1;   /* Initial value of PSR[15] */
+    CURRENT_LATCHES.SSP = 0x3000;                                               /* Initial value of system stack pointer */
+    CURRENT_LATCHES.REGS[6] = 0xFE00; /* Initial value of user stack pointer */ // FIXME: USP?
+    CURRENT_LATCHES.PSR_XV = 1;                                                 /* Initial value of PSR[15] */
 
     NEXT_LATCHES = CURRENT_LATCHES;
 
@@ -657,7 +658,7 @@ int SEXT(int imme, int digit) {
 }
 
 void set_interrupts() {
-    CURRENT_LATCHES.INT = 1;
+    NEXT_LATCHES.INT = 1;
 }
 
 void eval_micro_sequencer() {
@@ -676,8 +677,9 @@ void eval_micro_sequencer() {
         NEXT_LATCHES.STATE_NUMBER = 0b000000 + ((IR & 0xF000) >> 12); // 0,0,IR[15:12]
     } else {
         NEXT_LATCHES.STATE_NUMBER =
-            (J_BIT & 0b111000) +
-            ((J_BIT & 0b001000) | (((COND_BIT & 0b100) >> 2) & (~(COND_BIT & 0b010) >> 1) & (COND_BIT & 0b001) & (CURRENT_LATCHES.INT | CURRENT_LATCHES.PSR_XV)) << 3) +
+            (J_BIT & 0b010000) +
+            ((J_BIT & 0b100000) | (((COND_BIT & 0b100) >> 2) & ((COND_BIT & 0b010) >> 1) & ~(COND_BIT & 0b001) & ((CURRENT_LATCHES.PSR_XV))) << 4) +
+            ((J_BIT & 0b001000) | (((COND_BIT & 0b100) >> 2) & (~(COND_BIT & 0b010) >> 1) & (COND_BIT & 0b001) & (CURRENT_LATCHES.INT)) << 3) +
             ((J_BIT & 0b000100) | ((~(COND_BIT & 0b100) >> 2) & ((COND_BIT & 0b010) >> 1) & ~(COND_BIT & 0b001) & CURRENT_LATCHES.BEN) << 2) +
             ((J_BIT & 0b000010) | ((~(COND_BIT & 0b100) >> 2) & (~(COND_BIT & 0b010) >> 1) & (COND_BIT & 0b001) & CURRENT_LATCHES.READY) << 1) +
             ((J_BIT & 0b000001) | ((~(COND_BIT & 0b100) >> 2) & ((COND_BIT & 0b010) >> 1) & (COND_BIT & 0b001) & ((CURRENT_LATCHES.IR & 0x0800) >> 11)));
@@ -926,7 +928,7 @@ void drive_bus() {
         } else if (Gate_SP) {
             BUS = LATCH_SPMUX;
         } else if (Gate_VECTOR) {
-            BUS = Low16bits(Low16bits(CURRENT_LATCHES.VECTOR << 1) + 0x2000);
+            BUS = Low16bits(Low16bits(CURRENT_LATCHES.VECTOR << 1) + 0x0200);
         } else if (Gate_Old_PC) {
             BUS = CURRENT_LATCHES.PC - 2;
         } else {
@@ -1013,8 +1015,8 @@ void latch_datapath_values() {
 
     if (LD_CC || LD_PSR) {
         if (LD_PSR) {
-            NEXT_LATCHES.N = BUS & 0x0004;
-            NEXT_LATCHES.Z = BUS & 0x0002;
+            NEXT_LATCHES.N = (BUS & 0x0004) >> 2;
+            NEXT_LATCHES.Z = (BUS & 0x0002) >> 1;
             NEXT_LATCHES.P = BUS & 0x0001;
         } else {
             if (BUS == 0) {
@@ -1050,7 +1052,7 @@ void latch_datapath_values() {
         if (LD_USP) {
             NEXT_LATCHES.PSR_XV = 0;
         } else {
-            NEXT_LATCHES.PSR_XV = BUS & 0x8000;
+            NEXT_LATCHES.PSR_XV = (BUS & 0x8000) >> 15;
         }
     }
 
