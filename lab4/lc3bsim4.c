@@ -69,6 +69,7 @@ int LATCH_MDR;
 /***************************************************************/
 enum CS_BITS {
     IRD,
+    COND2,
     COND1,
     COND0,
     J5,
@@ -91,8 +92,10 @@ enum CS_BITS {
     GATE_SHF,
     PCMUX1,
     PCMUX0,
-    DRMUX,
-    SR1MUX,
+    DRMUX1,
+    DRMUX0,
+    SR1MUX1,
+    SR1MUX0,
     ADDR1MUX,
     ADDR2MUX1,
     ADDR2MUX0,
@@ -104,6 +107,19 @@ enum CS_BITS {
     DATA_SIZE,
     LSHF1,
     /* MODIFY: you have to add all your new control signals */
+    LD_PSR,
+    LD_USP,
+    LD_SSP,
+    LD_VECTOR,
+    GatePSR,
+    GateUSP,
+    GateSSP,
+    GateSP,
+    GateVector,
+    GateOldPc,
+    SPMUX,
+    ResetInt,
+    ResetEXCond,
     CONTROL_STORE_BITS
 } CS_BITS;
 
@@ -111,7 +127,7 @@ enum CS_BITS {
 /* Functions to get at the control bits.                       */
 /***************************************************************/
 int GetIRD(int *x) { return (x[IRD]); }
-int GetCOND(int *x) { return ((x[COND1] << 1) + x[COND0]); }
+int GetCOND(int *x) { return ((x[COND2] << 2) + (x[COND1] << 1) + x[COND0]); }
 int GetJ(int *x) { return ((x[J5] << 5) + (x[J4] << 4) +
                            (x[J3] << 3) + (x[J2] << 2) +
                            (x[J1] << 1) + x[J0]); }
@@ -128,8 +144,8 @@ int GetGATE_ALU(int *x) { return (x[GATE_ALU]); }
 int GetGATE_MARMUX(int *x) { return (x[GATE_MARMUX]); }
 int GetGATE_SHF(int *x) { return (x[GATE_SHF]); }
 int GetPCMUX(int *x) { return ((x[PCMUX1] << 1) + x[PCMUX0]); }
-int GetDRMUX(int *x) { return (x[DRMUX]); }
-int GetSR1MUX(int *x) { return (x[SR1MUX]); }
+int GetDRMUX(int *x) { return ((x[DRMUX1] << 1) + x[DRMUX0]); }
+int GetSR1MUX(int *x) { return ((x[SR1MUX1] << 1) + x[SR1MUX0]); }
 int GetADDR1MUX(int *x) { return (x[ADDR1MUX]); }
 int GetADDR2MUX(int *x) { return ((x[ADDR2MUX1] << 1) + x[ADDR2MUX0]); }
 int GetMARMUX(int *x) { return (x[MARMUX]); }
@@ -139,6 +155,19 @@ int GetR_W(int *x) { return (x[R_W]); }
 int GetDATA_SIZE(int *x) { return (x[DATA_SIZE]); }
 int GetLSHF1(int *x) { return (x[LSHF1]); }
 /* MODIFY: you can add more Get functions for your new control signals */
+int GetLD_PSR(int *x) { return (x[LD_PSR]); }
+int GetLD_USP(int *x) { return (x[LD_USP]); }
+int GetLD_SSP(int *x) { return (x[LD_SSP]); }
+int GetLD_VECTOR(int *x) { return (x[LD_VECTOR]); }
+int GetGatePSR(int *x) { return (x[GatePSR]); }
+int GetGateUSP(int *x) { return (x[GateUSP]); }
+int GetGateSSP(int *x) { return (x[GateSSP]); }
+int GetGateSP(int *x) { return (x[GateSP]); }
+int GetGateVector(int *x) { return (x[GateVector]); }
+int GetGateOldPc(int *x) { return (x[GateOldPc]); }
+int GetSPMUX(int *x) { return (x[SPMUX]); }
+int GetResetInt(int *x) { return (x[ResetInt]); }
+int GetResetEXCond(int *x) { return (x[ResetEXCond]); }
 
 /***************************************************************/
 /* The control store rom.                                      */
