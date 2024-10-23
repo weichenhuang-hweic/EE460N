@@ -159,12 +159,12 @@ int GetLD_PSR(int *x) { return (x[LD_PSR]); }
 int GetLD_USP(int *x) { return (x[LD_USP]); }
 int GetLD_SSP(int *x) { return (x[LD_SSP]); }
 int GetLD_VECTOR(int *x) { return (x[LD_VECTOR]); }
-int GetGatePSR(int *x) { return (x[GatePSR]); }
-int GetGateUSP(int *x) { return (x[GateUSP]); }
-int GetGateSSP(int *x) { return (x[GateSSP]); }
-int GetGateSP(int *x) { return (x[GateSP]); }
-int GetGateVector(int *x) { return (x[GateVector]); }
-int GetGateOldPc(int *x) { return (x[GateOldPc]); }
+int GetGate_PSR(int *x) { return (x[GatePSR]); }
+int GetGate_USP(int *x) { return (x[GateUSP]); }
+int GetGate_SSP(int *x) { return (x[GateSSP]); }
+int GetGate_SP(int *x) { return (x[GateSP]); }
+int GetGate_Vector(int *x) { return (x[GateVector]); }
+int GetGate_OldPc(int *x) { return (x[GateOldPc]); }
 int GetSPMUX(int *x) { return (x[SPMUX]); }
 int GetResetInt(int *x) { return (x[ResetInt]); }
 int GetResetEXCond(int *x) { return (x[ResetEXCond]); }
@@ -852,8 +852,9 @@ void drive_bus() {
     int Gate_ALU = GetGATE_ALU(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
     int Gate_MARMUX = GetGATE_MARMUX(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
     int Gate_SHF = GetGATE_SHF(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
+    int Gate_Old_PC = GetGate_OldPc(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
 
-    if (Gate_PC + Gate_MDR + Gate_ALU + Gate_MARMUX + Gate_SHF > 1) {
+    if (Gate_PC + Gate_MDR + Gate_ALU + Gate_MARMUX + Gate_SHF + Gate_Old_PC > 1) {
         exit(1);
     } else {
         if (Gate_PC) {
@@ -876,6 +877,8 @@ void drive_bus() {
             BUS = LATCH_SHFMUX;
         } else if (Gate_MARMUX) {
             BUS = LATCH_MARMUX;
+        } else if (Gate_Old_PC) {
+            BUS = CURRENT_LATCHES.PC - 2;
         } else {
             BUS = 0;
         }
