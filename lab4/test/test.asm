@@ -1,80 +1,65 @@
-.ORIG x3000
+        .ORIG   x3000
 
-;TEST LOAD
-LEA R6, ONE
-LDW R0, R6, #0
-LDB R1, R6, #1
-LDB R2, R6, #2
-LDW R3, R6, #1
-LDW R4, R6, #2
-;EXPECTED: R0 = xABCD, R1 = xFFAB, R2 = x34, R3 = x1234, R4 = x3457, R6 = 0x302E
+        ; LDW Test protection exception R5 = 5
+        ;LEA    R0, ProtHigh
+        ;LDW    R0, R0, #0
+        ;LDW    R1, R0, #0
 
-;TEST STORE
-LEA R6, FOUR
-LDW R7, R6, #0
-STB R1, R7, #0
-STB R2, R7, #1
-STW R0, R7, #1
-STW R3, R7, #4
-;EXPECTED x4000 = xAB, x4001 = x34, x4002 = xABCD, x4008 = x1234
+        ; STW Test protection exception R5 = 5
+        ;LEA    R0, ProtHigh
+        ;LDW    R0, R0, #0
+        ;STW    R1, R0, #0
 
-;TEST ADD
-ADD R5, R0, R3
-ADD R5, R5, #-1
-ADD R5, R5, #2 ;EXPECTED: R5 = xBE02
+        ; LDB Test protection exception R5 = 5
+        ;LEA    R0, ProtHigh
+        ;LDW    R0, R0, #0
+        ;LDB    R1, R0, #0
 
-;TEST AND
-AND R5, R5, x0003 ; R5=x0002
-AND R5, R5, #-1  ; R5=x0002
-AND R5, R5, R3  ; R5=x0000
+        ; STB Test protection exception R5 = 5
+        ;LEA    R0, ProtHigh
+        ;LDW    R0, R0, #0
+        ;STB    R1, R0, #0
 
-;TEST BRANCH
-AND R5, R5, #0
-ADD R5, R5, #5
-LOOP ADD R5, R5, #-1
-BRP LOOP
-BR NEXT
+        ; JMP Test protection exception R5 = 5
+        ;LEA    R0, ProtHigh
+        ;LDW    R0, R0, #0
+        ;JMP    R0
 
-ONE .FILL xABCD
-TWO .FILL x1234
-THREE .FILL x3457
-FOUR .FILL x4000
-FIVE .FILL xF379
+        ; LDW Test unaligned exception R5 = 4
+        ;LEA    R0, OddAddress
+        ;LDW    R0, R0, #0
+        ;LDW    R1, R0, #0
 
-JUMPTEST AND R5, R5, #0
-ADD R5, R5, #14
-LEA R5, NEXTTEST
-JMP R5
+        ; STW Test unaligned exception R5 = 4
+        ;LEA    R0, OddAddress
+        ;LDW    R0, R0, #0
+        ;STW    R1, R0, #0
 
-;TEST JUMP
-NEXT LEA R5, JUMPTEST ;R5=x3038
-JMP R5
+        ; LDB Test Odd adress R5 = 0
+        ;LEA    R0, OddAddress
+        ;LDW    R0, R0, #0
+        ;LDB    R1, R0, #0
 
-TESTJSR AND R5, R5, #0
-ADD R5, R5, #-2
-RET
+        ; JMP Test unaligned exception R5 = 4
+        ;LEA    R0, OddAddress
+        ;LDW    R0, R0, #0
+        ;JMP    R0
 
-; TEST JSR
-NEXTTEST JSR TESTJSR
-LEA R5, TESTJSR
-JSRR R5
+        ; LDW Test protection unaligned exception R5 = 5
+        ;LEA    R0, ProtOdd
+        ;LDW    R0, R0, #0
+        ;LDW    R1, R0, #0
 
-;TEST SHIFT
-LEA R7, FIVE
-LDW R5, R7, #0 ; R5=xf379
-LSHF R6, R3, #2 ;R3=x48d0
-RSHFL R6, R5, #1 ;R6=x79bc
-RSHFA R4, R5, #1 ;R4=xf9bc
+        ; Test Unknown Opcode 10 R5 = 3
+        ;.FILL   xA000
 
-;TEST XOR
-NOT R5, R0 ;R5=x5432
-NOT R6, R5 ;R6=xabcd
-XOR R6, R6, R5 ;R6=xffff
-XOR R5, R0, R3 ;R5=xb9f9
-XOR R5, R0, #-1 ;R5=x5432
-XOR R5, R0, #7 ;R5=abca
-XOR R5, R0, #0 ;R5=abcd
+        ; Test Unknown Opcode 11 R5 = 3
+        ;.FILL   xB000
 
-HALT
+        HALT
 
-.END
+
+ ProtHigh    .FILL  x2FFF
+ OddAddress  .FILL  x3033
+ ProtOdd     .FILL  x0023
+        .END
