@@ -990,7 +990,7 @@ void latch_datapath_values() {
             NEXT_LATCHES.STATE_NUMBER = 0b001010;
         }
         // unaligned memory access exception
-        else if (((BUS & 0x0001) && (DATA_SIZE)) {
+        else if ((BUS & 0x0001) && (DATA_SIZE)) {
             NEXT_LATCHES.EXC = 1;
             NEXT_LATCHES.EXCV = 0x03;
             NEXT_LATCHES.STATE_NUMBER = 0b001010;
