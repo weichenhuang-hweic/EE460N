@@ -1072,14 +1072,6 @@ void latch_datapath_values() {
         }
     }
 
-    if (CURRENT_LATCHES.INT) {
-        NEXT_LATCHES.INTV = 0x01;
-    }
-
-    if (CURRENT_LATCHES.EXC) {
-        NEXT_LATCHES.EXCV = 0x01;
-    }
-
     if (RESET_INT) {
         NEXT_LATCHES.INT = 0;
     }
