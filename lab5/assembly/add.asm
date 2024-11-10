@@ -23,6 +23,9 @@ Loop    LDB    R3, R0, #0
 
         STW    R1, R0, #0
 
+        JMP    R1
+
+        ; TODO: add exception test: Protection, Unaligned, Page Fault, Unknown Opcode
         ; Test protection exception
         AND    R0, R0, #0
         STW    R1, R0, #0
