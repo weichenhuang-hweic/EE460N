@@ -1,12 +1,5 @@
         .ORIG   x3000
 
-        ; Initialize 1 to Mem[0x4000]
-        LEA    R0, Base
-        LDW    R0, R0, #0
-        AND    R1, R1, #0
-        ADD    R1, R1, #1
-        STW    R1, R0, #0
-
         ; Sum first 20 bytes from Mem[0xC000]
         LEA    R0, SUMS
         LDW    R0, R0, #0
@@ -27,8 +20,12 @@ Loop    LDB    R3, R0, #0
 
         ; TODO: add exception test: Protection, Unaligned, Page Fault, Unknown Opcode
         ; Test protection exception
-        AND    R0, R0, #0
-        STW    R1, R0, #0
+        ; AND    R0, R0, #0
+        ; STW    R1, R0, #0
+
+        ; Test Page Fault
+        ; LEA    R0, R0, PAGEFAULT
+        ; LDW    R1, R1, #0
 
         ; Test unaligned access exception
         ; ADD    R0, R0, #3
@@ -39,7 +36,6 @@ Loop    LDB    R3, R0, #0
 
         HALT
 
-Base    .FILL   x4000
 SUMS    .FILL   xC000
-
+PAGEFAULT .FILL X4000
         .END

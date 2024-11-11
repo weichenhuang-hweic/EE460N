@@ -52,6 +52,9 @@ int LATCH_MDR;
 int LATCH_SP;
 int LATCH_SPMUX;
 
+// lab 5
+int LATCH_MDRVALUEMUX;
+
 /***************************************************************/
 /* A couple of useful definitions.                             */
 /***************************************************************/
@@ -125,6 +128,16 @@ enum CS_BITS {
     SPMUX,
     ResetInt,
     ResetEXC,
+    LD_VA,
+    GateVA,
+    LD_TEMPPSR,
+    GateTEMPPSR,
+    GatePTBR,
+    MDRINMUX1,
+    MDRINMUX0,
+    MDRVALUEMUX,
+    LD_SAVESTATE,
+    TRANS,
     CONTROL_STORE_BITS
 } CS_BITS;
 
@@ -159,7 +172,7 @@ int GetMIO_EN(int *x) { return (x[MIO_EN]); }
 int GetR_W(int *x) { return (x[R_W]); }
 int GetDATA_SIZE(int *x) { return (x[DATA_SIZE]); }
 int GetLSHF1(int *x) { return (x[LSHF1]); }
-/* MODIFY: you can add more Get functions for your new control signals */
+/* MODIFY: Lab 4 */
 int GetLD_PSR(int *x) { return (x[LD_PSR]); }
 int GetLD_USP(int *x) { return (x[LD_USP]); }
 int GetLD_SSP(int *x) { return (x[LD_SSP]); }
@@ -173,6 +186,16 @@ int GetGate_OldPc(int *x) { return (x[GateOldPc]); }
 int GetSPMUX(int *x) { return (x[SPMUX]); }
 int GetResetInt(int *x) { return (x[ResetInt]); }
 int GetResetEXC(int *x) { return (x[ResetEXC]); }
+/* MODIFY: Lab 5 */
+int GetLD_VA(int *x) { return (x[LD_VA]); }
+int GetGate_VA(int *x) { return (x[GateVA]); }
+int GetLD_TEMPPSR(int *x) { return (x[LD_TEMPPSR]); }
+int GetGate_TEMPPSR(int *x) { return (x[GateTEMPPSR]); }
+int GetGate_PTBR(int *x) { return (x[GatePTBR]); }
+int GetMDRINMUX(int *x) { return ((x[MDRINMUX1] << 1) + x[MDRINMUX0]); }
+int GetMDRVALUEMUX(int *x) { return (x[MDRVALUEMUX]); }
+int GetLD_SAVESTATE(int *x) { return (x[LD_SAVESTATE]); }
+int GetTRANS(int *x) { return (x[TRANS]); }
 
 /***************************************************************/
 /* The control store rom.                                      */
@@ -188,7 +211,7 @@ int CONTROL_STORE[CONTROL_STORE_ROWS][CONTROL_STORE_BITS];
    the least significant byte of a word. WE1 is used for the most significant
    byte of a word. */
 
-#define WORDS_IN_MEM 0x08000
+#define WORDS_IN_MEM 0x2000 /* 32 frames */
 #define MEM_CYCLES 5
 int MEMORY[WORDS_IN_MEM][2];
 
@@ -235,11 +258,24 @@ typedef struct System_Latches_Struct {
     int USP;    /* User stack pointer */
     int PSR_XV; /* We omit PSD[14:3]*/
     int VECTOR;
+
+    /* For lab 5 */
+    int VA;   /* Temporary VA register */
+    int PTBR; /* Page Table Base Register */
+    int SAVE_STATE;
+    int TEMPPSR;
+
 } System_Latches;
 
 /* Data Structure for Latch */
 
 System_Latches CURRENT_LATCHES, NEXT_LATCHES;
+
+/* For lab 5 */
+#define PAGE_NUM_BITS 9
+#define PTE_PFN_MASK 0x3E00
+#define PTE_VALID_MASK 0x0004
+#define PAGE_OFFSET_MASK 0x1FF
 
 /***************************************************************/
 /* A cycle counter.                                            */
@@ -535,9 +571,9 @@ void init_memory() {
 /* Purpose   : Load program and service routines into mem.    */
 /*                                                            */
 /**************************************************************/
-void load_program(char *program_filename) {
+void load_program(char *program_filename, int is_virtual_base) {
     FILE *prog;
-    int ii, word, program_base;
+    int ii, word, program_base, pte, virtual_pc;
 
     /* Open program file. */
     prog = fopen(program_filename, "r");
@@ -554,6 +590,31 @@ void load_program(char *program_filename) {
         exit(-1);
     }
 
+    if (is_virtual_base) {
+        if (CURRENT_LATCHES.PTBR == 0) {
+            printf("Error: Page table base not loaded %s\n", program_filename);
+            exit(-1);
+        }
+
+        /* convert virtual_base to physical_base */
+        virtual_pc = program_base << 1;
+        pte = (MEMORY[(CURRENT_LATCHES.PTBR + (((program_base << 1) >> PAGE_NUM_BITS) << 1)) >> 1][1] << 8) |
+              MEMORY[(CURRENT_LATCHES.PTBR + (((program_base << 1) >> PAGE_NUM_BITS) << 1)) >> 1][0];
+
+        printf("virtual base of program: %04x\npte: %04x\n", program_base << 1, pte);
+        if ((pte & PTE_VALID_MASK) == PTE_VALID_MASK) {
+            program_base = (pte & PTE_PFN_MASK) | ((program_base << 1) & PAGE_OFFSET_MASK);
+            printf("physical base of program: %x\n\n", program_base);
+            program_base = program_base >> 1;
+        } else {
+            printf("attempting to load a program into an invalid (non-resident) page\n\n");
+            exit(-1);
+        }
+    } else {
+        /* is page table */
+        CURRENT_LATCHES.PTBR = program_base << 1;
+    }
+
     ii = 0;
     while (fscanf(prog, "%x\n", &word) != EOF) {
         /* Make sure it fits. */
@@ -566,11 +627,12 @@ void load_program(char *program_filename) {
         /* Write the word to memory array. */
         MEMORY[program_base + ii][0] = word & 0x00FF;
         MEMORY[program_base + ii][1] = (word >> 8) & 0x00FF;
+        ;
         ii++;
     }
 
-    if (CURRENT_LATCHES.PC == 0)
-        CURRENT_LATCHES.PC = (program_base << 1);
+    if (CURRENT_LATCHES.PC == 0 && is_virtual_base)
+        CURRENT_LATCHES.PC = virtual_pc;
 
     printf("Read %d words from program into memory.\n\n", ii);
 }
@@ -588,15 +650,17 @@ void initialize(char *argv[], int num_prog_files) {
     init_control_store(argv[1]);
 
     init_memory();
+    load_program(argv[2], 0);
     for (i = 0; i < num_prog_files; i++) {
-        load_program(argv[i + 2]);
+        load_program(argv[i + 3], 1);
     }
     CURRENT_LATCHES.Z = 1;
     CURRENT_LATCHES.STATE_NUMBER = INITIAL_STATE_NUMBER;
     memcpy(CURRENT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[INITIAL_STATE_NUMBER], sizeof(int) * CONTROL_STORE_BITS);
-    CURRENT_LATCHES.SSP = 0x3000; /* Initial value of system stack pointer */
-    CURRENT_LATCHES.USP = 0xFE00; /* Initial value of user stack pointer */
-    CURRENT_LATCHES.PSR_XV = 1;   /* Initial value of PSR[15] */
+    CURRENT_LATCHES.SSP = 0x3000;  /* Initial value of system stack pointer */
+    CURRENT_LATCHES.USP = 0xFE00;  /* Initial value of user stack pointer */
+    CURRENT_LATCHES.PSR_XV = 1;    /* Initial value of PSR[15] */
+    CURRENT_LATCHES.PTBR = 0x1000; /* Initial value of page table base register */
 
     NEXT_LATCHES = CURRENT_LATCHES;
 
@@ -612,15 +676,15 @@ int main(int argc, char *argv[]) {
     FILE *dumpsim_file;
 
     /* Error Checking */
-    if (argc < 3) {
-        printf("Error: usage: %s <micro_code_file> <program_file_1> <program_file_2> ...\n",
+    if (argc < 4) {
+        printf("Error: usage: %s <micro_code_file> <page table file> <program_file_1> <program_file_2> ...\n",
                argv[0]);
         exit(1);
     }
 
     printf("LC-3b Simulator\n\n");
 
-    initialize(argv, argc - 2);
+    initialize(argv, argc - 3);
 
     if ((dumpsim_file = fopen("dumpsim", "w")) == NULL) {
         printf("Error: Can't open dumpsim file\n");
@@ -659,6 +723,7 @@ int SEXT(int imme, int digit) {
 
 void set_interrupts() {
     NEXT_LATCHES.INT = 1;
+    NEXT_LATCHES.INTV = 0x01;
 }
 
 void eval_micro_sequencer() {
@@ -669,10 +734,22 @@ void eval_micro_sequencer() {
 
     int *micro_instruction = CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER];
     int IRD_BIT = GetIRD(micro_instruction);
+    int TRANS_BIT = GetTRANS(micro_instruction);
+    int LD_SAVESTATE = GetLD_SAVESTATE(micro_instruction);
     int COND_BIT = GetCOND(micro_instruction);
     int J_BIT = GetJ(micro_instruction);
 
-    if (IRD_BIT) {
+    if (TRANS_BIT == 1 && LD_SAVESTATE == 0) {
+        int READ_WRITE = GetR_W(micro_instruction);
+        if (READ_WRITE) {
+            NEXT_LATCHES.STATE_NUMBER = 0b110111;
+        } else {
+            NEXT_LATCHES.STATE_NUMBER = 0b111001;
+        }
+        NEXT_LATCHES.SAVE_STATE = J_BIT;
+    } else if (TRANS_BIT == 0 && LD_SAVESTATE == 1) {
+        NEXT_LATCHES.STATE_NUMBER = CURRENT_LATCHES.SAVE_STATE;
+    } else if (IRD_BIT) {
         int IR = CURRENT_LATCHES.IR;
         NEXT_LATCHES.STATE_NUMBER = 0b000000 + ((IR & 0xF000) >> 12); // 0,0,IR[15:12]
     } else {
@@ -688,7 +765,7 @@ void eval_micro_sequencer() {
     // Unknown State Exception
     if (NEXT_LATCHES.STATE_NUMBER == 0b001010 || NEXT_LATCHES.STATE_NUMBER == 0b001011) {
         NEXT_LATCHES.EXC = 1;
-        NEXT_LATCHES.EXCV = 0x04;
+        NEXT_LATCHES.EXCV = 0x05;
     }
 }
 
@@ -875,6 +952,23 @@ void eval_bus_drivers() {
     } else {
         LATCH_SPMUX = LATCH_SP - 2;
     }
+
+    // MDRVALUEMUX
+    int MDRVALUEMUX = GetMDRVALUEMUX(micro_instruction);
+    if (MDRVALUEMUX) {
+        LATCH_MDRVALUEMUX = (0x0000 | (CURRENT_LATCHES.MDR & 0x3E00) | (CURRENT_LATCHES.VA & 0x01FF));
+    } else {
+        int DATA_SIZE = GetDATA_SIZE(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
+        if (DATA_SIZE) {
+            LATCH_MDRVALUEMUX = CURRENT_LATCHES.MDR;
+        } else {
+            if (CURRENT_LATCHES.MAR & 0x0001) {
+                LATCH_MDRVALUEMUX = Low16bits(SEXT((CURRENT_LATCHES.MDR & 0xff00) >> 8, 8));
+            } else {
+                LATCH_MDRVALUEMUX = Low16bits(SEXT(CURRENT_LATCHES.MDR & 0x00ff, 8));
+            }
+        }
+    }
 }
 
 void drive_bus() {
@@ -895,6 +989,9 @@ void drive_bus() {
     int Gate_SP = GetGate_SP(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
     int Gate_VECTOR = GetGate_VECTOR(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
     int Gate_Old_PC = GetGate_OldPc(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
+    int GateVA = GetGate_VA(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
+    int GateTEMPPSR = GetGate_TEMPPSR(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
+    int GatePTBR = GetGate_PTBR(CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER]);
 
     if (Gate_PC + Gate_MDR + Gate_ALU + Gate_MARMUX + Gate_SHF + Gate_PSR + Gate_USP + Gate_SSP + Gate_SP + Gate_VECTOR + Gate_Old_PC > 1) {
         exit(1);
@@ -902,17 +999,7 @@ void drive_bus() {
         if (Gate_PC) {
             BUS = CURRENT_LATCHES.PC;
         } else if (Gate_MDR) {
-            int *micro_instruction = CONTROL_STORE[CURRENT_LATCHES.STATE_NUMBER];
-            int DATA_SIZE = GetDATA_SIZE(micro_instruction);
-            if (DATA_SIZE) {
-                BUS = CURRENT_LATCHES.MDR;
-            } else {
-                if (CURRENT_LATCHES.MAR & 0x0001) {
-                    BUS = Low16bits(SEXT((CURRENT_LATCHES.MDR & 0xff00) >> 8, 8));
-                } else {
-                    BUS = Low16bits(SEXT(CURRENT_LATCHES.MDR & 0x00ff, 8));
-                }
-            }
+            BUS = LATCH_MDRVALUEMUX;
         } else if (Gate_ALU) {
             BUS = LATCH_ALUMUX;
         } else if (Gate_SHF) {
@@ -931,6 +1018,12 @@ void drive_bus() {
             BUS = Low16bits(Low16bits(CURRENT_LATCHES.VECTOR << 1) + 0x0200);
         } else if (Gate_Old_PC) {
             BUS = CURRENT_LATCHES.PC - 2;
+        } else if (GateVA) {
+            BUS = CURRENT_LATCHES.VA;
+        } else if (GateTEMPPSR) {
+            BUS = CURRENT_LATCHES.TEMPPSR;
+        } else if (GatePTBR) {
+            BUS = CURRENT_LATCHES.PTBR + Low16bits(((CURRENT_LATCHES.VA & 0xFE00) >> 9) << 1);
         } else {
             BUS = 0;
         }
@@ -961,42 +1054,54 @@ void latch_datapath_values() {
     int LD_VECTOR = GetLD_VECTOR(micro_instruction);
     int RESET_INT = GetResetInt(micro_instruction);
     int RESET_EXC = GetResetEXC(micro_instruction);
+    int LD_VA = GetLD_VA(micro_instruction);
+    int LD_TEMPPSR = GetLD_TEMPPSR(micro_instruction);
 
     if (LD_MDR) {
         int MIO_EN = GetMIO_EN(micro_instruction);
         if (MIO_EN) {
             NEXT_LATCHES.MDR = LATCH_MDR;
         } else {
+            int MDRINMUX = GetMDRINMUX(micro_instruction);
             int DATA_SIZE = GetDATA_SIZE(micro_instruction);
+            int BUS_VALUE = -1;
+
+            if (MDRINMUX == 0) {
+                BUS_VALUE = BUS;
+            } else if (MDRINMUX == 1) {
+                BUS_VALUE = Low16bits(BUS | 0x0001);
+            } else if (MDRINMUX == 2) {
+                BUS_VALUE = Low16bits(BUS | 0x0003);
+            } else {
+                exit(1);
+            }
+
             if (DATA_SIZE) {
-                NEXT_LATCHES.MDR = BUS;
+                NEXT_LATCHES.MDR = BUS_VALUE;
             } else {
                 if (CURRENT_LATCHES.MAR & 0x0001) {
-                    NEXT_LATCHES.MDR = ((BUS & 0x00ff) << 8) | (BUS & 0x00ff);
+                    NEXT_LATCHES.MDR = ((BUS_VALUE & 0x00ff) << 8) | (BUS_VALUE & 0x00ff);
                 } else {
-                    NEXT_LATCHES.MDR = BUS;
+                    NEXT_LATCHES.MDR = BUS_VALUE;
                 }
+            }
+
+            if (MDRINMUX != 0 && ((BUS_VALUE & 0x0008) >> 3) == 0 && CURRENT_LATCHES.PSR_XV == 1 && ((CURRENT_LATCHES.IR & 0xF000) >> 12) != 0b001111) {
+                // protection exception
+                NEXT_LATCHES.EXC = 1;
+                NEXT_LATCHES.EXCV = 0x04;
+                NEXT_LATCHES.STATE_NUMBER = 0b001010;
+            } else if (MDRINMUX != 0 && ((BUS_VALUE & 0x0004) >> 2) == 0 && CURRENT_LATCHES.PSR_XV == 1 && ((CURRENT_LATCHES.IR & 0xF000) >> 12) != 0b001111) {
+                // page fault exception
+                NEXT_LATCHES.EXC = 1;
+                NEXT_LATCHES.EXCV = 0x02;
+                NEXT_LATCHES.STATE_NUMBER = 0b001010;
             }
         }
     }
 
     if (LD_MAR) {
-        // Lab 4: check exceptions
-        int DATA_SIZE = GetDATA_SIZE(micro_instruction);
-        // protection exception
-        if ((BUS < 0x3000) && CURRENT_LATCHES.PSR_XV == 1 && ((CURRENT_LATCHES.IR & 0xF000) >> 12) != 0b001111) {
-            NEXT_LATCHES.EXC = 1;
-            NEXT_LATCHES.EXCV = 0x02;
-            NEXT_LATCHES.STATE_NUMBER = 0b001010;
-        }
-        // unaligned memory access exception
-        else if ((BUS & 0x0001) && (DATA_SIZE)) {
-            NEXT_LATCHES.EXC = 1;
-            NEXT_LATCHES.EXCV = 0x03;
-            NEXT_LATCHES.STATE_NUMBER = 0b001010;
-        } else {
-            NEXT_LATCHES.MAR = BUS;
-        }
+        NEXT_LATCHES.MAR = BUS;
     }
 
     if (LD_IR) {
@@ -1078,5 +1183,21 @@ void latch_datapath_values() {
 
     if (RESET_EXC) {
         NEXT_LATCHES.EXC = 0;
+    }
+
+    if (LD_VA) {
+        int DATA_SIZE = GetDATA_SIZE(micro_instruction);
+        // unaligned memory access exception
+        if ((BUS & 0x0001) && (DATA_SIZE)) {
+            NEXT_LATCHES.EXC = 1;
+            NEXT_LATCHES.EXCV = 0x03;
+            NEXT_LATCHES.STATE_NUMBER = 0b001010;
+        } else {
+            NEXT_LATCHES.VA = BUS;
+        }
+    }
+
+    if (LD_TEMPPSR) {
+        NEXT_LATCHES.TEMPPSR = BUS;
     }
 }

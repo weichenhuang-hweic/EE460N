@@ -18,7 +18,7 @@
     
     ; Loop PageTable and Reset Reference Bit
 LOOP LDW R2, R0, #0
-    AND R2, R2, x1E
+    AND R2, R2, #-2
     STW R2, R0, #0
     ADD R0, R0, #2
     ADD R1, R1, #-1
