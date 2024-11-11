@@ -1091,7 +1091,7 @@ void latch_datapath_values() {
                 NEXT_LATCHES.EXC = 1;
                 NEXT_LATCHES.EXCV = 0x04;
                 NEXT_LATCHES.STATE_NUMBER = 0b001010;
-            } else if (MDRINMUX != 0 && ((BUS_VALUE & 0x0004) >> 2) == 0 && CURRENT_LATCHES.PSR_XV == 1 && ((CURRENT_LATCHES.IR & 0xF000) >> 12) != 0b001111) {
+            } else if (MDRINMUX != 0 && ((BUS_VALUE & 0x0004) >> 2) == 0) {
                 // page fault exception
                 NEXT_LATCHES.EXC = 1;
                 NEXT_LATCHES.EXCV = 0x02;

@@ -16,16 +16,13 @@ Loop    LDB    R3, R0, #0
 
         STW    R1, R0, #0
 
+        ; Test Protection
         JMP    R1
 
-        ; TODO: add exception test: Protection, Unaligned, Page Fault, Unknown Opcode
-        ; Test protection exception
-        ; AND    R0, R0, #0
-        ; STW    R1, R0, #0
-
         ; Test Page Fault
-        ; LEA    R0, R0, PAGEFAULT
-        ; LDW    R1, R1, #0
+        ; LEA    R0, PAGEFAULT
+        ; LDW    R0, R0, #0
+        ; LDW    R1, R0, #0
 
         ; Test unaligned access exception
         ; ADD    R0, R0, #3
