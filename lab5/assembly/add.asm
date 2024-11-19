@@ -34,5 +34,5 @@ Loop    LDB    R3, R0, #0
         HALT
 
 SUMS    .FILL   xC000
-PAGEFAULT .FILL X4000
+PAGEFAULT .FILL X5000
         .END

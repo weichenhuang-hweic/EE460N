@@ -9,3 +9,4 @@ This repository contains all the lab assignments for the course. Each lab is des
 - [Lab 2](lab2/)
 - [Lab 3](lab3/)
 - [Lab 4](lab4/)
+- [Lab 5](lab5/)
