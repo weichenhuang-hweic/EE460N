@@ -926,6 +926,8 @@ void SR_stage() {
         sr_p = 1;
 }
 
+int trap_pc, target_pc, mem_pcmux;
+
 /************************* MEM_stage() *************************/
 void MEM_stage() {
 
@@ -984,9 +986,36 @@ void DE_stage() {
     }
 }
 
+int read_word, icache_r;
+int ld_pc, ld_de;
+
 /************************* FETCH_stage() *************************/
 void FETCH_stage() {
 
     /* your code for FETCH stage goes here */
-    `
+    icache_access(PC, &read_word, &icache_r);
+
+    // TODO: ld_pc, ld_de assign
+
+    if (ld_pc) {
+        switch (mem_pcmux) {
+        case 0:
+            PC += 2;
+            break;
+        case 1:
+            PC = target_pc;
+            break;
+        case 2:
+            PC = trap_pc;
+            break;
+        default:
+            break;
+        }
+    }
+
+    if (ld_de) {
+        NEW_PS.DE_NPC = PC + 2;
+        NEW_PS.DE_IR = read_word;
+        // TODO: NEW_PS.DE_V
+    }
 }
