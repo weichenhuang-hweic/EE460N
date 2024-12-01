@@ -1,6 +1,6 @@
 /*
-    Name 1: Your Name
-    UTEID 1: Your UTEID
+    Name 1: Wei-Chen Huang
+    UTEID 1: wh9442
 */
 
 /***************************************************************/
@@ -963,20 +963,34 @@ void AGEX_stage() {
     }
 }
 
+int v_de_br_stall,
+    dep_stall;
+
 /************************* DE_stage() *************************/
 void DE_stage() {
 
-    int CONTROL_STORE_ADDRESS; /* You need to implement the logic to
-                      set the value of this variable. Look
-                      at the figure for DE stage */
+    int CONTROL_STORE_ADDRESS = (((PS.DE_IR & 0xF800) >> 10) | ((PS.DE_IR & 0x0020) >> 5));
+    int *control_store_bits = CONTROL_STORE[CONTROL_STORE_ADDRESS];
     int ii, jj = 0;
-    int LD_AGEX; /* You need to write code to compute the value of
+    int LD_AGEX;
+    /* TODO: You need to write code to compute the value of
             LD.AGEX signal */
 
+    // TODO: v_de_br_stall, dep_stall assign
+
     /* your code for DE stage goes here */
+    int de_sr1 = (PS.DE_IR & 0x01C0) >> 6;
+    int de_sr2 = (PS.DE_IR & 0x2000) ? ((PS.DE_IR >> 0x0E00) >> 9) : (PS.DE_IR & 0x0007);
 
     if (LD_AGEX) {
         /* Your code for latching into AGEX latches goes here */
+        NEW_PS.AGEX_NPC = PS.DE_NPC;
+        NEW_PS.AGEX_IR = PS.DE_IR;
+        NEW_PS.AGEX_SR1 = REGS[de_sr1];
+        NEW_PS.AGEX_SR2 = REGS[de_sr2];
+        NEW_PS.AGEX_CC = (N << 2) | (Z << 1) | P;
+        NEW_PS.AGEX_DRID = control_store_bits[DRMUX] ? 7 : (PS.DE_IR >> 0x0E00) >> 9;
+        // TODO: AGEX_V
 
         /* The code below propagates the control signals from the CONTROL
            STORE to the AGEX.CS latch. */
