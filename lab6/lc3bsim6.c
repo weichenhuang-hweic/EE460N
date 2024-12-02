@@ -943,17 +943,99 @@ void MEM_stage() {
     }
 }
 
+int v_agex_ld_cc,
+    v_agex_ld_reg,
+    v_agex_br_stall;
+
 /************************* AGEX_stage() *************************/
 void AGEX_stage() {
+
+    int res_addr1_mux,
+        res_addr2_mux,
+        res_lshf1,
+        res_address_mux,
+        res_sr2_mux,
+        res_alu,
+        res_shf,
+        res_alu_result_mux;
 
     int ii, jj = 0;
     int LD_MEM; /* You need to write code to compute the value of LD.MEM
            signal */
 
     /* your code for AGEX stage goes here */
+    /* ADDR1MUX */
+    res_addr1_mux = Get_ADDR1MUX(PS.AGEX_CS) ? PS.AGEX_SR1 : PS.AGEX_NPC;
+    /* ADDR2MUX */
+    switch (Get_ADDR2MUX(PS.AGEX_CS)) {
+    case 0:
+        res_addr2_mux = 0;
+        break;
+    case 1:
+        res_addr2_mux = PS.AGEX_IR & 0x003F;
+        if (res_addr2_mux & 0x0020)
+            res_addr2_mux |= 0xFFC0;
+        break;
+    case 2:
+        res_addr2_mux = PS.AGEX_IR & 0x01FF;
+        if (res_addr2_mux & 0x0100)
+            res_addr2_mux |= 0xFE00;
+        break;
+    case 3:
+        res_addr2_mux = PS.AGEX_IR & 0x07FF;
+        if (res_addr2_mux & 0x0400)
+            res_addr2_mux |= 0xF800;
+        break;
+    }
+    /* LSHF1 */
+    res_lshf1 = Get_LSHF1(PS.AGEX_CS) ? (res_addr2_mux << 1) : res_addr2_mux;
+    /* ADDRESSMUX */
+    res_address_mux = Get_ADDRESSMUX(PS.AGEX_CS) ? (res_addr1_mux + res_lshf1) : ((PS.AGEX_IR & 0x00FF) << 1);
+    /* SHF */
+    if (PS.AGEX_IR & 0x0010) {
+        if (PS.AGEX_IR & 0x0020) {
+            res_shf = PS.AGEX_SR1 >> (PS.AGEX_IR & 0x000F);
+            if (PS.AGEX_SR1 & 0x8000) {
+                res_shf |= (0xFFFF << (16 - (PS.AGEX_IR & 0x000F)));
+            }
+        } else {
+            res_shf = PS.AGEX_SR1 >> (PS.AGEX_IR & 0x000F);
+        }
+    } else {
+        res_shf = PS.AGEX_SR1 << PS.AGEX_IR & 0x000F;
+    }
+    /* SR2MUX */
+    res_sr2_mux = Get_SR2MUX(PS.AGEX_CS) ? ((PS.AGEX_IR & 0x001F) | (PS.AGEX_IR & 0x0010 ? 0xFFE0 : 0x0000)) : PS.AGEX_SR2;
+    /* ALU */
+    switch (Get_ALUK(PS.AGEX_CS)) {
+    case 0:
+        res_alu = PS.AGEX_SR1 + res_sr2_mux;
+        break;
+    case 1:
+        res_alu = PS.AGEX_SR1 & res_sr2_mux;
+        break;
+    case 2:
+        res_alu = PS.AGEX_SR1 ^ res_sr2_mux;
+        break;
+    case 3:
+        res_alu = res_sr2_mux;
+        break;
+    }
+    /* ALU_RESULTMUX */
+    res_alu_result_mux = Get_ALU_RESULTMUX(PS.AGEX_CS) ? res_alu : res_shf;
+
+    // TODO: v_agex_ld_cc, v_agex_ld_reg, v_agex_br_stall assign
 
     if (LD_MEM) {
         /* Your code for latching into MEM latches goes here */
+        NEW_PS.MEM_ADDRESS = res_address_mux;
+        NEW_PS.MEM_NPC = PS.AGEX_NPC;
+        NEW_PS.MEM_CC = PS.AGEX_CC;
+        NEW_PS.MEM_ALU_RESULT = res_alu_result_mux;
+        NEW_PS.MEM_IR = PS.AGEX_IR;
+        NEW_PS.MEM_DRID = PS.AGEX_DRID;
+
+        // TODO: NEW_PS.MEM_V
 
         /* The code below propagates the control signals from AGEX.CS latch
            to MEM.CS latch. */
