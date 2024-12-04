@@ -1132,18 +1132,52 @@ int v_de_br_stall,
 /************************* DE_stage() *************************/
 void DE_stage() {
 
-    int CONTROL_STORE_ADDRESS = (((PS.DE_IR & 0xF800) >> 10) | ((PS.DE_IR & 0x0020) >> 5));
-    int *control_store_bits = CONTROL_STORE[CONTROL_STORE_ADDRESS];
+    int control_store_address = (((PS.DE_IR & 0xF800) >> 10) | ((PS.DE_IR & 0x0020) >> 5));
+    int *control_store_bits = CONTROL_STORE[control_store_address];
+    int LD_AGEX = !mem_stall;
     int ii, jj = 0;
-    int LD_AGEX;
-    /* TODO: You need to write code to compute the value of
-            LD.AGEX signal */
-
-    // TODO: v_de_br_stall, dep_stall assign
 
     /* your code for DE stage goes here */
     int de_sr1 = (PS.DE_IR & 0x01C0) >> 6;
     int de_sr2 = (PS.DE_IR & 0x2000) ? ((PS.DE_IR >> 0x0E00) >> 9) : (PS.DE_IR & 0x0007);
+
+    v_de_br_stall = Get_DE_BR_STALL(control_store_bits) & PS.DE_V;
+
+    dep_stall = 0;
+    // Check DE
+    if (PS.DE_V) {
+        // Stall to hold CC bits
+        if (Get_BR_OP(control_store_bits) && (v_agex_ld_cc || v_mem_ld_cc || v_sr_ld_cc)) {
+            dep_stall = 1;
+        }
+    }
+    // Check AGEX
+    if (v_agex_ld_reg &&
+        ((PS.AGEX_DRID == de_sr1 && Get_SR1_NEEDED(control_store_bits)) ||
+         (PS.AGEX_DRID == de_sr2) && Get_SR2_NEEDED(control_store_bits))) {
+        dep_stall = 1;
+    }
+    // Check MEM
+    if (v_mem_ld_reg &&
+        ((PS.MEM_DRID == de_sr1 && Get_SR1_NEEDED(control_store_bits)) ||
+         (PS.MEM_DRID == de_sr2) && Get_SR2_NEEDED(control_store_bits))) {
+        dep_stall = 1;
+    }
+    // Check SR
+    if (v_sr_ld_reg &&
+        ((PS.SR_DRID == de_sr1 && Get_SR1_NEEDED(control_store_bits)) ||
+         (PS.SR_DRID == de_sr2) && Get_SR2_NEEDED(control_store_bits))) {
+        dep_stall = 1;
+    }
+
+    if (v_sr_ld_reg) {
+        REGS[sr_reg_id] = sr_reg_data;
+    }
+    if (v_sr_ld_cc) {
+        N = sr_n;
+        Z = sr_z;
+        P = sr_p;
+    }
 
     if (LD_AGEX) {
         /* Your code for latching into AGEX latches goes here */
@@ -1153,12 +1187,12 @@ void DE_stage() {
         NEW_PS.AGEX_SR2 = REGS[de_sr2];
         NEW_PS.AGEX_CC = (N << 2) | (Z << 1) | P;
         NEW_PS.AGEX_DRID = control_store_bits[DRMUX] ? 7 : (PS.DE_IR >> 0x0E00) >> 9;
-        // TODO: AGEX_V
+        NEW_PS.AGEX_V = !dep_stall && PS.DE_V;
 
         /* The code below propagates the control signals from the CONTROL
            STORE to the AGEX.CS latch. */
         for (ii = COPY_AGEX_CS_START; ii < NUM_CONTROL_STORE_BITS; ii++) {
-            NEW_PS.AGEX_CS[jj++] = CONTROL_STORE[CONTROL_STORE_ADDRESS][ii];
+            NEW_PS.AGEX_CS[jj++] = CONTROL_STORE[control_store_address][ii];
         }
     }
 }
