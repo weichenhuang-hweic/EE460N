@@ -1039,10 +1039,8 @@ void AGEX_stage() {
         res_alu,
         res_shf,
         res_alu_result_mux;
-
+    int LD_MEM = !mem_stall;
     int ii, jj = 0;
-    int LD_MEM; /* You need to write code to compute the value of LD.MEM
-           signal */
 
     /* your code for AGEX stage goes here */
     /* ADDR1MUX */
@@ -1105,7 +1103,9 @@ void AGEX_stage() {
     /* ALU_RESULTMUX */
     res_alu_result_mux = Get_ALU_RESULTMUX(PS.AGEX_CS) ? res_alu : res_shf;
 
-    // TODO: v_agex_ld_cc, v_agex_ld_reg, v_agex_br_stall assign
+    v_agex_ld_cc = Get_AGEX_LD_CC(PS.AGEX_CS) & PS.AGEX_V;
+    v_agex_ld_reg = Get_AGEX_LD_REG(PS.AGEX_CS) & PS.AGEX_V;
+    v_agex_br_stall = Get_AGEX_BR_STALL(PS.AGEX_CS) & PS.AGEX_V;
 
     if (LD_MEM) {
         /* Your code for latching into MEM latches goes here */
@@ -1115,8 +1115,7 @@ void AGEX_stage() {
         NEW_PS.MEM_ALU_RESULT = res_alu_result_mux;
         NEW_PS.MEM_IR = PS.AGEX_IR;
         NEW_PS.MEM_DRID = PS.AGEX_DRID;
-
-        // TODO: NEW_PS.MEM_V
+        NEW_PS.MEM_V = PS.AGEX_V;
 
         /* The code below propagates the control signals from AGEX.CS latch
            to MEM.CS latch. */
