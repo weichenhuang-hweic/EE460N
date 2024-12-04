@@ -1001,8 +1001,9 @@ void MEM_stage() {
     /* other */
     trap_pc = dcache_readworld;
     target_pc = PS.MEM_ADDRESS;
-
-    // TODO: v_mem_ld_cc, v_mem_ld_reg, v_mem_br_stall assign
+    v_mem_ld_cc = Get_MEM_LD_CC(PS.MEM_CS) & PS.MEM_V;
+    v_mem_ld_reg = Get_MEM_LD_REG(PS.MEM_CS) & PS.MEM_V;
+    v_mem_br_stall = Get_MEM_BR_STALL(PS.MEM_CS) & PS.MEM_V;
 
     int ii, jj = 0;
 
@@ -1013,8 +1014,7 @@ void MEM_stage() {
     NEW_PS.SR_ALU_RESULT = PS.MEM_ALU_RESULT;
     NEW_PS.SR_IR = PS.MEM_IR;
     NEW_PS.SR_DRID = PS.MEM_DRID;
-
-    // TODO: NEW_PS.SR_V
+    NEW_PS.SR_V = !mem_stall & PS.MEM_V;
 
     /* The code below propagates the control signals from MEM.CS latch
        to SR.CS latch. You still need to latch other values into the
