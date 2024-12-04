@@ -926,14 +926,95 @@ void SR_stage() {
         sr_p = 1;
 }
 
-int trap_pc, target_pc, mem_pcmux;
+int v_dcache_en,
+    v_mem_ld_cc,
+    v_mem_ld_reg,
+    v_mem_br_stall;
+int trap_pc, target_pc, mem_pcmux, mem_stall, mem_drid;
 
 /************************* MEM_stage() *************************/
 void MEM_stage() {
 
+    int dcache_r,
+        dcache_readworld,
+        dcache_writeword,
+        dcache_rw0,
+        dcache_rw1;
+
+    v_dcache_en = Get_DCACHE_EN(PS.MEM_CS) & PS.MEM_V;
+
+    /* WE Logic */
+    if (Get_DCACHE_RW(PS.MEM_CS)) {
+        dcache_rw0 = Get_DATA_SIZE(PS.MEM_CS) | (PS.MEM_ADDRESS & 0x0001);
+        dcache_rw1 = Get_DATA_SIZE(PS.MEM_CS) | ((PS.MEM_ADDRESS & 0x0001) == 0);
+    } else {
+        dcache_rw0 = 0;
+        dcache_rw1 = 0;
+    }
+
+    /* writeword output logic */
+    if (Get_DATA_SIZE(PS.MEM_CS)) {
+        dcache_writeword = PS.MEM_ALU_RESULT;
+    } else {
+        dcache_writeword = (PS.MEM_ALU_RESULT & 0xFF00) | ((PS.MEM_ALU_RESULT & 0xFF00) >> 8);
+    }
+
+    /* D-Cache */
+    if (v_dcache_en) {
+        dcache_access(PS.MEM_ADDRESS, &dcache_readworld, dcache_writeword, &dcache_r, dcache_rw0, dcache_rw1);
+    }
+
+    /* readword output logic */
+    if (!Get_DATA_SIZE(PS.MEM_CS)) {
+        if (PS.MEM_ADDRESS & 0x0001) {
+            dcache_readworld = (dcache_readworld & 0xFF00) >> 8;
+        } else {
+            dcache_readworld = dcache_readworld & 0x00FF;
+        }
+        if (dcache_readworld & 0x0080) {
+            dcache_readworld |= 0xFF00;
+        }
+    }
+
+    /* BR logic */
+    mem_pcmux = 0;
+    if (PS.MEM_V) {
+        if (Get_UNCOND_OP(PS.MEM_CS)) {
+            mem_pcmux = 1;
+        } else if (Get_TRAP_OP(PS.MEM_CS)) {
+            mem_pcmux = 2;
+        } else if (Get_BR_OP(PS.MEM_CS)) {
+            // Check N, Z, P
+            if (((PS.MEM_CC & 0x4) && (PS.MEM_IR & 0x800)) ||
+                ((PS.MEM_CC & 0x2) && (PS.MEM_IR & 0x400)) ||
+                ((PS.MEM_CC & 0x1) && (PS.MEM_IR & 0x200))) {
+                mem_pcmux = 1;
+            }
+        } else {
+            mem_pcmux = 0;
+        }
+    }
+
+    /* stall logic */
+    mem_stall = v_dcache_en & !dcache_r;
+
+    /* other */
+    trap_pc = dcache_readworld;
+    target_pc = PS.MEM_ADDRESS;
+
+    // TODO: v_mem_ld_cc, v_mem_ld_reg, v_mem_br_stall assign
+
     int ii, jj = 0;
 
     /* your code for MEM stage goes here */
+    NEW_PS.SR_ADDRESS = PS.MEM_ADDRESS;
+    NEW_PS.SR_DATA = dcache_readworld;
+    NEW_PS.SR_NPC = PS.MEM_NPC;
+    NEW_PS.SR_ALU_RESULT = PS.MEM_ALU_RESULT;
+    NEW_PS.SR_IR = PS.MEM_IR;
+    NEW_PS.SR_DRID = PS.MEM_DRID;
+
+    // TODO: NEW_PS.SR_V
 
     /* The code below propagates the control signals from MEM.CS latch
        to SR.CS latch. You still need to latch other values into the
