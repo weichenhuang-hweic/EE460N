@@ -1172,7 +1172,16 @@ void FETCH_stage() {
     /* your code for FETCH stage goes here */
     icache_access(PC, &read_word, &icache_r);
 
-    // TODO: ld_pc, ld_de assign
+    ld_pc = 0;
+    int stall = dep_stall | mem_stall | v_de_br_stall | v_agex_br_stall | v_mem_br_stall;
+    if ((icache_r && (!stall)) || mem_pcmux) {
+        ld_pc = 1;
+    }
+
+    ld_de = 0;
+    if (!dep_stall && !mem_stall) {
+        ld_de = 1;
+    }
 
     if (ld_pc) {
         switch (mem_pcmux) {
@@ -1193,6 +1202,6 @@ void FETCH_stage() {
     if (ld_de) {
         NEW_PS.DE_NPC = PC + 2;
         NEW_PS.DE_IR = read_word;
-        // TODO: NEW_PS.DE_V
+        NEW_PS.DE_V = icache_r && !(v_de_br_stall || v_agex_br_stall || v_mem_br_stall);
     }
 }
