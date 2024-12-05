@@ -947,8 +947,8 @@ void MEM_stage() {
 
     /* WE Logic */
     if (Get_DCACHE_RW(PS.MEM_CS)) {
-        dcache_rw0 = Get_DATA_SIZE(PS.MEM_CS) | (PS.MEM_ADDRESS & 0x0001);
-        dcache_rw1 = Get_DATA_SIZE(PS.MEM_CS) | ((PS.MEM_ADDRESS & 0x0001) == 0);
+        dcache_rw1 = Get_DATA_SIZE(PS.MEM_CS) | (PS.MEM_ADDRESS & 0x0001);
+        dcache_rw0 = Get_DATA_SIZE(PS.MEM_CS) | ((PS.MEM_ADDRESS & 0x0001) == 0);
     } else {
         dcache_rw0 = 0;
         dcache_rw1 = 0;
@@ -958,7 +958,7 @@ void MEM_stage() {
     if (Get_DATA_SIZE(PS.MEM_CS)) {
         dcache_writeword = PS.MEM_ALU_RESULT;
     } else {
-        dcache_writeword = (PS.MEM_ALU_RESULT & 0xFF00) | ((PS.MEM_ALU_RESULT & 0xFF00) >> 8);
+        dcache_writeword = (PS.MEM_ALU_RESULT & 0x00FF) | ((PS.MEM_ALU_RESULT & 0x00FF) << 8);
     }
 
     /* D-Cache */
