@@ -935,7 +935,7 @@ int trap_pc, target_pc, mem_pcmux, mem_stall, mem_drid;
 /************************* MEM_stage() *************************/
 void MEM_stage() {
 
-    int dcache_r,
+    int dcache_r = 0,
         dcache_readworld,
         dcache_writeword,
         dcache_rw0,
@@ -996,7 +996,7 @@ void MEM_stage() {
     }
 
     /* stall logic */
-    mem_stall = v_dcache_en & !dcache_r;
+    mem_stall = v_dcache_en & (!dcache_r);
 
     /* other */
     trap_pc = dcache_readworld;
@@ -1014,7 +1014,7 @@ void MEM_stage() {
     NEW_PS.SR_ALU_RESULT = PS.MEM_ALU_RESULT;
     NEW_PS.SR_IR = PS.MEM_IR;
     NEW_PS.SR_DRID = PS.MEM_DRID;
-    NEW_PS.SR_V = !mem_stall & PS.MEM_V;
+    NEW_PS.SR_V = (!mem_stall) & PS.MEM_V;
 
     /* The code below propagates the control signals from MEM.CS latch
        to SR.CS latch. You still need to latch other values into the
@@ -1138,7 +1138,7 @@ void DE_stage() {
 
     /* your code for DE stage goes here */
     int de_sr1 = (PS.DE_IR & 0x01C0) >> 6;
-    int de_sr2 = (PS.DE_IR & 0x2000) ? ((PS.DE_IR >> 0x0E00) >> 9) : (PS.DE_IR & 0x0007);
+    int de_sr2 = (PS.DE_IR & 0x2000) ? ((PS.DE_IR & 0x0E00) >> 9) : (PS.DE_IR & 0x0007);
 
     v_de_br_stall = Get_DE_BR_STALL(control_store_bits) & PS.DE_V;
 
@@ -1153,19 +1153,19 @@ void DE_stage() {
     // Check AGEX
     if (v_agex_ld_reg &&
         ((PS.AGEX_DRID == de_sr1 && Get_SR1_NEEDED(control_store_bits)) ||
-         (PS.AGEX_DRID == de_sr2) && Get_SR2_NEEDED(control_store_bits))) {
+         ((PS.AGEX_DRID == de_sr2) && Get_SR2_NEEDED(control_store_bits)))) {
         dep_stall = 1;
     }
     // Check MEM
     if (v_mem_ld_reg &&
         ((PS.MEM_DRID == de_sr1 && Get_SR1_NEEDED(control_store_bits)) ||
-         (PS.MEM_DRID == de_sr2) && Get_SR2_NEEDED(control_store_bits))) {
+         ((PS.MEM_DRID == de_sr2) && Get_SR2_NEEDED(control_store_bits)))) {
         dep_stall = 1;
     }
     // Check SR
     if (v_sr_ld_reg &&
         ((PS.SR_DRID == de_sr1 && Get_SR1_NEEDED(control_store_bits)) ||
-         (PS.SR_DRID == de_sr2) && Get_SR2_NEEDED(control_store_bits))) {
+         ((PS.SR_DRID == de_sr2) && Get_SR2_NEEDED(control_store_bits)))) {
         dep_stall = 1;
     }
 
@@ -1185,7 +1185,7 @@ void DE_stage() {
         NEW_PS.AGEX_SR1 = REGS[de_sr1];
         NEW_PS.AGEX_SR2 = REGS[de_sr2];
         NEW_PS.AGEX_CC = (N << 2) | (Z << 1) | P;
-        NEW_PS.AGEX_DRID = control_store_bits[DRMUX] ? 7 : (PS.DE_IR >> 0x0E00) >> 9;
+        NEW_PS.AGEX_DRID = control_store_bits[DRMUX] ? 7 : (PS.DE_IR & 0x0E00) >> 9;
         NEW_PS.AGEX_V = !dep_stall && PS.DE_V;
 
         /* The code below propagates the control signals from the CONTROL
