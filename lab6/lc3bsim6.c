@@ -767,9 +767,7 @@ void initialize(char *ucode_filename, char *program_filename, int num_prog_files
 
     init_memory();
 
-    for (i = 0; i < num_prog_files; i++)
-
-    {
+    for (i = 0; i < num_prog_files; i++) {
         load_program(program_filename);
         while (*program_filename++ != '\0')
             ;
@@ -809,7 +807,6 @@ void dcache_access(int dcache_addr, int *read_word, int write_word, int *dcache_
 /*                                                             */
 /***************************************************************/
 void icache_access(int icache_addr, int *read_word, int *icache_r) {
-
     int addr = icache_addr >> 1;
     int random = CYCLE_COUNT % 13;
 
@@ -845,8 +842,14 @@ int main(int argc, char *argv[]) {
         exit(-1);
     }
 
-    while (1)
-        get_command(dumpsim_file);
+    idump(dumpsim_file);
+    for (int cccc = 0; cccc < 15; cccc++) {
+        run(1);
+        idump(dumpsim_file);
+    }
+
+    // while (1)
+    //     get_command(dumpsim_file);
 }
 
 /***************************************************************/
@@ -928,15 +931,14 @@ void SR_stage() {
 
 int v_dcache_en,
     v_mem_ld_cc,
-    v_mem_ld_reg,
-    v_mem_br_stall;
-int trap_pc, target_pc, mem_pcmux, mem_stall, mem_drid;
+    v_mem_ld_reg;
+int trap_pc, target_pc, mem_pcmux = 0, mem_drid;
 
 /************************* MEM_stage() *************************/
 void MEM_stage() {
 
     int dcache_r = 0,
-        dcache_readworld,
+        dcache_readworld = 0,
         dcache_writeword,
         dcache_rw0,
         dcache_rw1;
@@ -1014,7 +1016,7 @@ void MEM_stage() {
     NEW_PS.SR_ALU_RESULT = PS.MEM_ALU_RESULT;
     NEW_PS.SR_IR = PS.MEM_IR;
     NEW_PS.SR_DRID = PS.MEM_DRID;
-    NEW_PS.SR_V = (!mem_stall) & PS.MEM_V;
+    NEW_PS.SR_V = (!mem_stall) && PS.MEM_V;
 
     /* The code below propagates the control signals from MEM.CS latch
        to SR.CS latch. You still need to latch other values into the
@@ -1025,20 +1027,19 @@ void MEM_stage() {
 }
 
 int v_agex_ld_cc,
-    v_agex_ld_reg,
-    v_agex_br_stall;
+    v_agex_ld_reg;
 
 /************************* AGEX_stage() *************************/
 void AGEX_stage() {
 
-    int res_addr1_mux,
-        res_addr2_mux,
-        res_lshf1,
-        res_address_mux,
-        res_sr2_mux,
-        res_alu,
-        res_shf,
-        res_alu_result_mux;
+    int res_addr1_mux = 0,
+        res_addr2_mux = 0,
+        res_lshf1 = 0,
+        res_address_mux = 0,
+        res_sr2_mux = 0,
+        res_alu = 0,
+        res_shf = 0,
+        res_alu_result_mux = 0;
     int LD_MEM = !mem_stall;
     int ii, jj = 0;
 
@@ -1070,6 +1071,7 @@ void AGEX_stage() {
     res_lshf1 = Get_LSHF1(PS.AGEX_CS) ? (res_addr2_mux << 1) : res_addr2_mux;
     /* ADDRESSMUX */
     res_address_mux = Get_ADDRESSMUX(PS.AGEX_CS) ? (res_addr1_mux + res_lshf1) : ((PS.AGEX_IR & 0x00FF) << 1);
+    res_address_mux &= 0xFFFF;
     /* SHF */
     if (PS.AGEX_IR & 0x0010) {
         if (PS.AGEX_IR & 0x0020) {
@@ -1081,7 +1083,7 @@ void AGEX_stage() {
             res_shf = PS.AGEX_SR1 >> (PS.AGEX_IR & 0x000F);
         }
     } else {
-        res_shf = PS.AGEX_SR1 << PS.AGEX_IR & 0x000F;
+        res_shf = PS.AGEX_SR1 << (PS.AGEX_IR & 0x000F);
     }
     /* SR2MUX */
     res_sr2_mux = Get_SR2MUX(PS.AGEX_CS) ? ((PS.AGEX_IR & 0x001F) | (PS.AGEX_IR & 0x0010 ? 0xFFE0 : 0x0000)) : PS.AGEX_SR2;
@@ -1102,6 +1104,7 @@ void AGEX_stage() {
     }
     /* ALU_RESULTMUX */
     res_alu_result_mux = Get_ALU_RESULTMUX(PS.AGEX_CS) ? res_alu : res_shf;
+    res_alu_result_mux &= 0xFFFF;
 
     v_agex_ld_cc = Get_AGEX_LD_CC(PS.AGEX_CS) & PS.AGEX_V;
     v_agex_ld_reg = Get_AGEX_LD_REG(PS.AGEX_CS) & PS.AGEX_V;
@@ -1125,9 +1128,6 @@ void AGEX_stage() {
     }
 }
 
-int v_de_br_stall,
-    dep_stall;
-
 /************************* DE_stage() *************************/
 void DE_stage() {
 
@@ -1140,13 +1140,11 @@ void DE_stage() {
     int de_sr1 = (PS.DE_IR & 0x01C0) >> 6;
     int de_sr2 = (PS.DE_IR & 0x2000) ? ((PS.DE_IR & 0x0E00) >> 9) : (PS.DE_IR & 0x0007);
 
-    v_de_br_stall = Get_DE_BR_STALL(control_store_bits) & PS.DE_V;
-
     dep_stall = 0;
     // Check DE
     if (PS.DE_V) {
         // Stall to hold CC bits
-        if (Get_BR_OP(control_store_bits) && (v_agex_ld_cc || v_mem_ld_cc || v_sr_ld_cc)) {
+        if (Get_DE_BR_OP(control_store_bits) && (v_agex_ld_cc || v_mem_ld_cc || v_sr_ld_cc)) {
             dep_stall = 1;
         }
     }
@@ -1169,14 +1167,7 @@ void DE_stage() {
         dep_stall = 1;
     }
 
-    if (v_sr_ld_reg) {
-        REGS[sr_reg_id] = sr_reg_data;
-    }
-    if (v_sr_ld_cc) {
-        N = sr_n;
-        Z = sr_z;
-        P = sr_p;
-    }
+    v_de_br_stall = Get_DE_BR_STALL(control_store_bits) & PS.DE_V;
 
     if (LD_AGEX) {
         /* Your code for latching into AGEX latches goes here */
@@ -1186,7 +1177,7 @@ void DE_stage() {
         NEW_PS.AGEX_SR2 = REGS[de_sr2];
         NEW_PS.AGEX_CC = (N << 2) | (Z << 1) | P;
         NEW_PS.AGEX_DRID = control_store_bits[DRMUX] ? 7 : (PS.DE_IR & 0x0E00) >> 9;
-        NEW_PS.AGEX_V = !dep_stall && PS.DE_V;
+        NEW_PS.AGEX_V = !(dep_stall) && PS.DE_V;
 
         /* The code below propagates the control signals from the CONTROL
            STORE to the AGEX.CS latch. */
@@ -1194,26 +1185,40 @@ void DE_stage() {
             NEW_PS.AGEX_CS[jj++] = CONTROL_STORE[control_store_address][ii];
         }
     }
-}
 
-int read_word, icache_r;
-int ld_pc, ld_de;
+    if (v_sr_ld_reg) {
+        REGS[sr_reg_id] = sr_reg_data;
+    }
+    if (v_sr_ld_cc) {
+        N = sr_n;
+        Z = sr_z;
+        P = sr_p;
+    }
+}
 
 /************************* FETCH_stage() *************************/
 void FETCH_stage() {
+    int read_word;
+    int ld_pc, ld_de;
 
     /* your code for FETCH stage goes here */
     icache_access(PC, &read_word, &icache_r);
 
-    ld_pc = 0;
-    int stall = dep_stall | mem_stall | v_de_br_stall | v_agex_br_stall | v_mem_br_stall;
-    if ((icache_r && (!stall)) || mem_pcmux) {
-        ld_pc = 1;
+    ld_de = 0;
+    if (!(dep_stall || mem_stall)) {
+        ld_de = 1;
     }
 
-    ld_de = 0;
-    if (!dep_stall && !mem_stall) {
-        ld_de = 1;
+    if (ld_de) {
+        NEW_PS.DE_NPC = PC + 2;
+        NEW_PS.DE_IR = read_word;
+        NEW_PS.DE_V = icache_r && !(v_de_br_stall || v_agex_br_stall || v_mem_br_stall);
+    }
+
+    ld_pc = 0;
+    int stall = dep_stall || mem_stall || v_de_br_stall || v_agex_br_stall || v_mem_br_stall;
+    if ((icache_r && (!stall)) || mem_pcmux) {
+        ld_pc = 1;
     }
 
     if (ld_pc) {
@@ -1230,11 +1235,5 @@ void FETCH_stage() {
         default:
             break;
         }
-    }
-
-    if (ld_de) {
-        NEW_PS.DE_NPC = PC + 2;
-        NEW_PS.DE_IR = read_word;
-        NEW_PS.DE_V = icache_r && !(v_de_br_stall || v_agex_br_stall || v_mem_br_stall);
     }
 }
