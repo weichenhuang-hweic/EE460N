@@ -11,3 +11,8 @@ This repository contains all the lab assignments for the course. Each lab is des
 - [Lab 4](lab4/)
 - [Lab 5](lab5/)
 - [Lab 6](lab6/)
+
+## Course Problem Set and other resource
+- [Drive](https://drive.google.com/drive/folders/1U_65H_WXaVgt4TJUU8ACaauyhYfnEa2A?usp=sharing)
+- [TA Slide](https://drive.google.com/drive/folders/1rnwMVjGBXdIGQmGYisKLB43Mupvvz1TJ)
+- [Patt's website](https://users.ece.utexas.edu/~patt/24f.460n/)
